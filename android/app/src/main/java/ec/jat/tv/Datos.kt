@@ -20,6 +20,7 @@ import java.util.Locale
 object Datos {
 
     const val LISTA_ECUADOR = "https://iptv-org.github.io/iptv/countries/ec.m3u"
+    const val LISTA_ESPANOL = "https://iptv-org.github.io/iptv/languages/spa.m3u"
     private const val PREFS = "tvjat"
     private const val ARCHIVO_LISTA = "lista.m3u"
     const val NOMBRE_RESPALDO = "respaldo_tv_jat.json"
@@ -37,7 +38,8 @@ object Datos {
 
     fun guardarLista(ctx: Context, texto: String, nombre: String, fuente: String) {
         File(ctx.filesDir, ARCHIVO_LISTA).writeText(texto)
-        prefs(ctx).edit().putString("nombreLista", nombre).putString("fuente", fuente).apply()
+        prefs(ctx).edit().putString("nombreLista", nombre).putString("fuente", fuente)
+            .putString("caidos", "[]").putString("fechaRevision", "").apply()
         agregarReciente(ctx, nombre, fuente)
         guardarRespaldo(ctx)
     }
@@ -74,6 +76,25 @@ object Datos {
         return ahora
     }
 
+    // ---------- canales que no responden (revisión) ----------
+    fun caidos(ctx: Context): Set<String> {
+        val arr = try { JSONArray(prefs(ctx).getString("caidos", "[]") ?: "[]") } catch (e: Exception) { JSONArray() }
+        return (0 until arr.length()).map { arr.optString(it) }.toSet()
+    }
+    fun fechaRevision(ctx: Context): String = prefs(ctx).getString("fechaRevision", "") ?: ""
+    fun guardarRevision(ctx: Context, caidos: Set<String>) {
+        prefs(ctx).edit()
+            .putString("caidos", JSONArray(caidos.toList()).toString())
+            .putString("fechaRevision", SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date()))
+            .apply()
+        guardarRespaldo(ctx)
+    }
+    fun ocultarCaidos(ctx: Context) = prefs(ctx).getBoolean("ocultarCaidos", true)
+    fun setOcultarCaidos(ctx: Context, v: Boolean) {
+        prefs(ctx).edit().putBoolean("ocultarCaidos", v).apply()
+        guardarRespaldo(ctx)
+    }
+
     // ---------- último canal ----------
     fun ultimo(ctx: Context): String = prefs(ctx).getString("ultimo", "") ?: ""
     fun guardarUltimo(ctx: Context, url: String) {
@@ -90,6 +111,9 @@ object Datos {
         .put("favoritos", JSONArray(favoritos(ctx).toList()))
         .put("recientes", JSONArray(prefs(ctx).getString("recientes", "[]") ?: "[]"))
         .put("ultimo", ultimo(ctx))
+        .put("caidos", JSONArray(caidos(ctx).toList()))
+        .put("fechaRevision", fechaRevision(ctx))
+        .put("ocultarCaidos", ocultarCaidos(ctx))
         .put("listaM3u", textoLista(ctx) ?: "")
         .toString(2)
 
@@ -114,6 +138,9 @@ object Datos {
             .putString("favoritos", JSONArray(previos.toList()).toString())
             .putString("recientes", (json.optJSONArray("recientes") ?: JSONArray()).toString())
             .putString("ultimo", json.optString("ultimo", ultimo(ctx)))
+            .putString("caidos", (json.optJSONArray("caidos") ?: JSONArray()).toString())
+            .putString("fechaRevision", json.optString("fechaRevision", ""))
+            .putBoolean("ocultarCaidos", json.optBoolean("ocultarCaidos", true))
             .apply()
         guardarRespaldo(ctx)
         return M3u.leer(m3u).size

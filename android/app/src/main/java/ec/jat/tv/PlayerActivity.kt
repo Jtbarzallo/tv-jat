@@ -128,6 +128,7 @@ class PlayerActivity : Activity() {
         p.addListener(object : Player.Listener {
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
                 error.visibility = View.GONE
+                if (p.playbackState == Player.STATE_IDLE) p.prepare()
                 canalActual = canales.getOrNull(p.currentMediaItemIndex)
                 canalActual?.let { Datos.guardarUltimo(this@PlayerActivity, it.url) }
                 mostrarEtiqueta()
@@ -153,9 +154,18 @@ class PlayerActivity : Activity() {
                     p.play()
                     return
                 }
-                error.text = "😕 Este canal no está disponible ahora.\nPrueba el siguiente ⏭"
                 error.visibility = View.VISIBLE
                 vista.showController()
+                if (p.hasNextMediaItem()) {
+                    error.text = "😕 Este canal no está disponible ahora.\nPasando al siguiente…"
+                    manejador.postDelayed({
+                        if (error.visibility == View.VISIBLE && p.currentMediaItemIndex == idx) {
+                            p.seekToNextMediaItem(); p.prepare(); p.play()
+                        }
+                    }, 3000)
+                } else {
+                    error.text = "😕 Este canal no está disponible ahora."
+                }
             }
         })
 

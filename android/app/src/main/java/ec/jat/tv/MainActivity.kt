@@ -45,6 +45,8 @@ class MainActivity : Activity() {
     private var canales: List<Canal> = emptyList()
     private var filtrados: List<Canal> = emptyList()
     private var favoritos: MutableSet<String> = mutableSetOf()
+    private var caidos: Set<String> = emptySet()
+    private var revisando = false
     private var grupos: List<String> = listOf(TODOS, FAVORITOS)
 
     private lateinit var titulo: TextView
@@ -62,10 +64,14 @@ class MainActivity : Activity() {
         window.navigationBarColor = FONDO
         construirPantalla()
         favoritos = Datos.favoritos(this)
+        caidos = Datos.caidos(this)
 
         if (!atenderIntent(intent)) {
             val texto = Datos.textoLista(this)
-            if (texto != null) mostrarLista(texto)
+            if (texto != null) {
+                mostrarLista(texto)
+                if (Datos.fechaRevision(this).isEmpty()) revisarCanales()
+            }
             else descargarLista(Datos.LISTA_ECUADOR, "Canales de Ecuador")
         }
     }
@@ -184,13 +190,15 @@ class MainActivity : Activity() {
     private fun menuListas(ancla: View) {
         val menu = PopupMenu(this, ancla)
         menu.menu.add(0, 1, 0, "🇪🇨 Canales de Ecuador (gratis)")
+        menu.menu.add(0, 4, 0, "🌎 Canales en español (gratis)")
         menu.menu.add(0, 2, 1, "📂 Abrir archivo M3U…")
         menu.menu.add(0, 3, 2, "🔗 Pegar enlace de una lista…")
-        val recientes = Datos.recientes(this).filter { it.second != Datos.LISTA_ECUADOR }
+        val recientes = Datos.recientes(this).filter { it.second != Datos.LISTA_ECUADOR && it.second != Datos.LISTA_ESPANOL }
         recientes.forEachIndexed { i, r -> menu.menu.add(1, 100 + i, 10 + i, "🕘 ${r.first}") }
         menu.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> descargarLista(Datos.LISTA_ECUADOR, "Canales de Ecuador")
+                4 -> descargarLista(Datos.LISTA_ESPANOL, "Canales en español")
                 2 -> abrirArchivo()
                 3 -> pedirEnlace()
                 else -> recientes.getOrNull(it.itemId - 100)?.let { r -> descargarLista(r.second, r.first) }
@@ -202,6 +210,9 @@ class MainActivity : Activity() {
 
     private fun menuMas(ancla: View) {
         val menu = PopupMenu(this, ancla)
+        menu.menu.add(0, 5, 0, "🩺 Revisar qué canales funcionan")
+        menu.menu.add(0, 6, 0, if (Datos.ocultarCaidos(this)) "👁 Mostrar también los que no funcionan"
+                               else "🙈 Ocultar los que no funcionan")
         menu.menu.add(0, 1, 0, "🔄 Actualizar la lista")
         menu.menu.add(0, 2, 1, "💾 Guardar respaldo como…")
         menu.menu.add(0, 3, 2, "♻️ Recuperar respaldo…")
@@ -222,6 +233,11 @@ class MainActivity : Activity() {
                     addCategory(Intent.CATEGORY_OPENABLE)
                     type = "*/*"
                 }, PEDIR_IMPORTAR)
+                5 -> revisarCanales()
+                6 -> {
+                    Datos.setOcultarCaidos(this, !Datos.ocultarCaidos(this))
+                    filtrar()
+                }
                 4 -> AlertDialog.Builder(this)
                     .setTitle("TV JAT")
                     .setMessage("Reproductor de listas M3U.\n\n" +
@@ -275,6 +291,7 @@ class MainActivity : Activity() {
             PEDIR_IMPORTAR -> try {
                 val n = Datos.importar(this, uri)
                 favoritos = Datos.favoritos(this)
+                caidos = Datos.caidos(this)
                 Datos.textoLista(this)?.let { mostrarLista(it) }
                 aviso("Respaldo recuperado: $n canales ✔")
             } catch (e: Exception) { aviso("No se pudo recuperar: ${e.message}") }
@@ -339,13 +356,15 @@ class MainActivity : Activity() {
             return
         }
         Datos.guardarLista(this, texto, nombre, fuente)
+        caidos = emptySet()
         mostrarLista(texto)
-        aviso("${leidos.size} canales cargados ✔")
+        aviso("${leidos.size} canales cargados. Revisando cuáles funcionan…")
+        revisarCanales()
     }
 
     private fun mostrarLista(texto: String) {
         canales = M3u.leer(texto)
-        titulo.text = "${Datos.nombreLista(this).ifEmpty { "Lista" }} · ${canales.size} canales"
+        ponerTitulo()
         val nombresGrupo = canales.flatMap { it.grupo.split(';') }
             .map { it.trim() }.filter { it.isNotEmpty() }.distinct().sorted()
         grupos = listOf(TODOS, FAVORITOS) + nombresGrupo
@@ -354,10 +373,46 @@ class MainActivity : Activity() {
         filtrar()
     }
 
+    private fun ponerTitulo(progreso: String? = null) {
+        val base = "${Datos.nombreLista(this).ifEmpty { "Lista" }} · ${canales.size} canales"
+        titulo.text = when {
+            progreso != null -> "$base · $progreso"
+            Datos.fechaRevision(this).isNotEmpty() -> "$base · ${canales.count { it.url !in caidos }} funcionan"
+            else -> base
+        }
+    }
+
+    private fun revisarCanales() {
+        if (revisando || canales.isEmpty()) return
+        revisando = true
+        val lista = canales
+        ponerTitulo("🩺 revisando…")
+        thread {
+            Revisar.revisar(lista,
+                progreso = { h, t -> runOnUiThread { ponerTitulo("🩺 revisando $h/$t…") } },
+                fin = { muertos ->
+                    runOnUiThread {
+                        revisando = false
+                        if (lista !== canales) return@runOnUiThread   // cambiaron de lista mientras tanto
+                        Datos.guardarRevision(this, muertos)
+                        caidos = muertos
+                        ponerTitulo()
+                        filtrar()
+                        val ok = lista.count { it.url !in muertos }
+                        aviso("✔ Funcionan $ok de ${lista.size} canales" +
+                            if (Datos.ocultarCaidos(this) && muertos.isNotEmpty()) ". Los demás quedaron ocultos." else "")
+                    }
+                })
+            runOnUiThread { revisando = false }
+        }
+    }
+
     private fun filtrar() {
         val q = buscar.text.toString().trim().lowercase()
         val g = grupos.getOrNull(selectorGrupo.selectedItemPosition) ?: TODOS
+        val ocultar = Datos.ocultarCaidos(this)
         filtrados = canales.filter { c ->
+            !(ocultar && caidos.contains(c.url)) &&
             (q.isEmpty() || c.nombre.lowercase().contains(q)) &&
                 when (g) {
                     TODOS -> true
@@ -393,11 +448,13 @@ class MainActivity : Activity() {
             val logo = fila.getChildAt(0) as ImageView
             val textos = fila.getChildAt(1) as LinearLayout
             val estrella = fila.getChildAt(2) as TextView
+            val caido = caidos.contains(c.url)
             (textos.getChildAt(0) as TextView).text =
-                (if (c.url == Datos.ultimo(this@MainActivity)) "▶ " else "") + c.nombre
+                (if (caido) "✖ " else if (c.url == Datos.ultimo(this@MainActivity)) "▶ " else "") + c.nombre
+            fila.alpha = if (caido) 0.45f else 1f
             val sub = textos.getChildAt(1) as TextView
-            sub.text = c.grupo
-            sub.visibility = if (c.grupo.isEmpty()) View.GONE else View.VISIBLE
+            sub.text = if (caido) "No responde (última revisión)" else c.grupo
+            sub.visibility = if (sub.text.isEmpty()) View.GONE else View.VISIBLE
             Logos.poner(logo, c.logo)
             val fav = favoritos.contains(c.url)
             estrella.text = if (fav) "★" else "☆"
