@@ -127,6 +127,7 @@ object Datos {
         .put("caidos", JSONArray(caidos(ctx).toList()))
         .put("fechaRevision", fechaRevision(ctx))
         .put("ocultarCaidos", ocultarCaidos(ctx))
+        .put("progresoPeliculas", Peliculas.progresoJson(ctx))
         .put("listaM3u", textoLista(ctx) ?: "")
         .toString(2)
 
@@ -155,6 +156,7 @@ object Datos {
             .putString("fechaRevision", json.optString("fechaRevision", ""))
             .putBoolean("ocultarCaidos", json.optBoolean("ocultarCaidos", true))
             .apply()
+        Peliculas.importar(ctx, json.optJSONObject("progresoPeliculas"))
         guardarRespaldo(ctx)
         return M3u.leer(m3u).size
     }

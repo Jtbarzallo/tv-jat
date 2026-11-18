@@ -114,6 +114,9 @@ class MainActivity : Activity() {
         textos.addView(titulo)
         cabecera.addView(textos, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
 
+        val btnPelis = boton("🎬")
+        btnPelis.setOnClickListener { startActivity(Intent(this, PeliculasActivity::class.java)) }
+        cabecera.addView(btnPelis)
         val btnListas = boton("Listas ▾")
         btnListas.setOnClickListener { menuListas(it) }
         cabecera.addView(btnListas)
