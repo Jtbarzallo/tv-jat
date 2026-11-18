@@ -8,6 +8,8 @@
 - [x] v1.1 (2026-11-17): 🩺 revisión de canales desde el celular (oculta los que no responden),
       se hace sola al cargar una lista; opción mostrar/ocultar caídos; lista "Canales en español";
       en el reproductor, si un canal falla pasa solo al siguiente.
+- [x] v1.2 (2026-11-17): botón "☰ Canales" en el reproductor: panel lateral con la lista que se
+      desplaza mientras sigue el video; tocar un canal lo cambia; ✕ o atrás lo cierra.
 
 ## Pendiente / ideas
 - [ ] Guía de programación (EPG) si la lista trae `url-tvg`.
@@ -19,3 +21,5 @@
 - 2026-11-17: Jorge reporta que la mayoría de canales no abren. Causa: la lista de iptv-org
   tiene muchas retransmisiones no oficiales que se caen. Se agrega revisión de canales (v1.1).
   Respaldo: la revisión (canales caídos, fecha) también va en respaldo_tv_jat.json.
+- 2026-11-17: Jorge confirma que funciona bien (v1.1). Pide ver/desplazar la lista de canales
+  mientras ve la TV → panel lateral (v1.2). Sin datos nuevos que respaldar.

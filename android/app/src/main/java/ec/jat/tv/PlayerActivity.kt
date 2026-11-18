@@ -14,7 +14,12 @@ import android.util.Rational
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
+import android.widget.BaseAdapter
 import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ListView
 import android.widget.TextView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -36,6 +41,10 @@ class PlayerActivity : Activity() {
     private lateinit var etiqueta: TextView
     private lateinit var error: TextView
     private lateinit var btnTamano: TextView
+    private lateinit var btnCanales: TextView
+    private lateinit var panel: LinearLayout
+    private lateinit var listaPanel: ListView
+    private val adaptadorPanel = AdaptadorPanel()
     private val canales = Reproduccion.canales
     private val probadosHls = HashSet<String>()
     private val manejador = Handler(Looper.getMainLooper())
@@ -61,6 +70,7 @@ class PlayerActivity : Activity() {
             controllerShowTimeoutMs = 3500
             setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { v ->
                 btnTamano.visibility = v
+                btnCanales.visibility = if (panelAbierto()) View.GONE else v
                 if (v == View.VISIBLE) mostrarEtiqueta()
             })
         }
@@ -88,6 +98,56 @@ class PlayerActivity : Activity() {
         raiz.addView(btnTamano, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
             setMargins(dp(16), dp(16), dp(16), 0)
         })
+
+        btnCanales = TextView(this).apply {
+            text = "☰ Canales"
+            setTextColor(Color.WHITE)
+            textSize = 15f
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            background = GradientDrawable().apply { setColor(0xAA000000.toInt()); cornerRadius = dp(10).toFloat() }
+            setOnClickListener { abrirPanel() }
+        }
+        raiz.addView(btnCanales, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
+            setMargins(dp(16), dp(64), dp(16), 0)
+        })
+
+        // Panel lateral con la lista de canales (se desplaza mientras sigue el video)
+        panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xE614182C.toInt())
+            visibility = View.GONE
+            isClickable = true
+        }
+        val cabeceraPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(10), dp(6), dp(10))
+        }
+        cabeceraPanel.addView(TextView(this).apply {
+            text = "📺 Canales (${canales.size})"
+            setTextColor(Color.WHITE)
+            textSize = 17f
+            setTypeface(typeface, Typeface.BOLD)
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        cabeceraPanel.addView(TextView(this).apply {
+            text = "✕"
+            setTextColor(Color.WHITE)
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setOnClickListener { cerrarPanel() }
+        }, LinearLayout.LayoutParams(dp(44), dp(44)))
+        panel.addView(cabeceraPanel)
+        listaPanel = ListView(this).apply {
+            adapter = adaptadorPanel
+            divider = null
+            dividerHeight = dp(4)
+            setPadding(dp(8), 0, dp(8), dp(8))
+            clipToPadding = false
+            setOnItemClickListener { _, _, pos, _ -> cambiarCanal(pos) }
+        }
+        panel.addView(listaPanel, LinearLayout.LayoutParams(-1, 0, 1f))
+        val anchoPanel = (resources.displayMetrics.widthPixels * 0.42).toInt().coerceAtLeast(dp(260))
+        raiz.addView(panel, FrameLayout.LayoutParams(anchoPanel, -1, Gravity.END))
 
         error = TextView(this).apply {
             setTextColor(Color.WHITE)
@@ -131,6 +191,7 @@ class PlayerActivity : Activity() {
                 if (p.playbackState == Player.STATE_IDLE) p.prepare()
                 canalActual = canales.getOrNull(p.currentMediaItemIndex)
                 canalActual?.let { Datos.guardarUltimo(this@PlayerActivity, it.url) }
+                adaptadorPanel.notifyDataSetChanged()
                 mostrarEtiqueta()
             }
 
@@ -186,6 +247,71 @@ class PlayerActivity : Activity() {
         p.setMediaItems(items, inicio, 0L)
         p.prepare()
         p.playWhenReady = true
+    }
+
+    private fun panelAbierto() = panel.visibility == View.VISIBLE
+
+    private fun abrirPanel() {
+        panel.visibility = View.VISIBLE
+        btnCanales.visibility = View.GONE
+        vista.hideController()
+        adaptadorPanel.notifyDataSetChanged()
+        val actual = player?.currentMediaItemIndex ?: 0
+        listaPanel.setSelection((actual - 2).coerceAtLeast(0))
+    }
+
+    private fun cerrarPanel() {
+        panel.visibility = View.GONE
+    }
+
+    private fun cambiarCanal(pos: Int) {
+        val p = player ?: return
+        if (pos == p.currentMediaItemIndex && p.playbackState != Player.STATE_IDLE) return
+        p.seekToDefaultPosition(pos)
+        p.prepare()
+        p.play()
+        adaptadorPanel.notifyDataSetChanged()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (panelAbierto()) cerrarPanel() else super.onBackPressed()
+    }
+
+    private inner class AdaptadorPanel : BaseAdapter() {
+        override fun getCount() = canales.size
+        override fun getItem(p: Int) = canales[p]
+        override fun getItemId(p: Int) = p.toLong()
+
+        override fun getView(pos: Int, convertView: View?, parent: ViewGroup?): View {
+            val fila = (convertView as? LinearLayout) ?: LinearLayout(this@PlayerActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(8), dp(6), dp(8), dp(6))
+                addView(ImageView(this@PlayerActivity).apply {
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                }, LinearLayout.LayoutParams(dp(48), dp(36)))
+                addView(TextView(this@PlayerActivity).apply {
+                    setTextColor(Color.WHITE)
+                    textSize = 15f
+                    maxLines = 2
+                    setPadding(dp(10), 0, 0, 0)
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+            }
+            val c = canales[pos]
+            val actual = pos == player?.currentMediaItemIndex
+            Logos.poner(fila.getChildAt(0) as ImageView, c.logo)
+            (fila.getChildAt(1) as TextView).apply {
+                text = (if (actual) "▶ " else "${pos + 1}. ") + c.nombre
+                setTextColor(if (actual) 0xFF4FD1C5.toInt() else Color.WHITE)
+                setTypeface(null, if (actual) Typeface.BOLD else Typeface.NORMAL)
+            }
+            fila.background = GradientDrawable().apply {
+                setColor(if (actual) 0xFF2A3156.toInt() else 0x33FFFFFF)
+                cornerRadius = dp(8).toFloat()
+            }
+            return fila
+        }
     }
 
     private fun mostrarEtiqueta() {
@@ -249,7 +375,10 @@ class PlayerActivity : Activity() {
     override fun onPictureInPictureModeChanged(enPip: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(enPip, newConfig)
         vista.useController = !enPip
-        if (enPip) { etiqueta.visibility = View.GONE; btnTamano.visibility = View.GONE }
+        if (enPip) {
+            etiqueta.visibility = View.GONE; btnTamano.visibility = View.GONE
+            btnCanales.visibility = View.GONE; cerrarPanel()
+        }
     }
 
     override fun onStart() {
