@@ -191,9 +191,12 @@ class MainActivity : Activity() {
         val menu = PopupMenu(this, ancla)
         menu.menu.add(0, 1, 0, "🇪🇨 Canales de Ecuador (gratis)")
         menu.menu.add(0, 4, 0, "🌎 Canales en español (gratis)")
+        val sub = menu.menu.addSubMenu(0, 5, 0, "🌎 Más listas en español latino ▸")
+        Datos.LISTAS_LATINAS.forEachIndexed { i, l -> sub.add(2, 200 + i, i, l.first) }
         menu.menu.add(0, 2, 1, "📂 Abrir archivo M3U…")
         menu.menu.add(0, 3, 2, "🔗 Pegar enlace de una lista…")
-        val recientes = Datos.recientes(this).filter { it.second != Datos.LISTA_ECUADOR && it.second != Datos.LISTA_ESPANOL }
+        val recientes = Datos.recientes(this).filter { r -> r.second != Datos.LISTA_ECUADOR && r.second != Datos.LISTA_ESPANOL &&
+                Datos.LISTAS_LATINAS.none { it.second == r.second } }
         recientes.forEachIndexed { i, r -> menu.menu.add(1, 100 + i, 10 + i, "🕘 ${r.first}") }
         menu.setOnMenuItemClickListener {
             when (it.itemId) {
@@ -201,6 +204,10 @@ class MainActivity : Activity() {
                 4 -> descargarLista(Datos.LISTA_ESPANOL, "Canales en español")
                 2 -> abrirArchivo()
                 3 -> pedirEnlace()
+                5 -> {}
+                in 200..299 -> Datos.LISTAS_LATINAS.getOrNull(it.itemId - 200)?.let { l ->
+                    descargarLista(l.second, l.first.substringAfter(' ').substringBefore(" ("))
+                }
                 else -> recientes.getOrNull(it.itemId - 100)?.let { r -> descargarLista(r.second, r.first) }
             }
             true

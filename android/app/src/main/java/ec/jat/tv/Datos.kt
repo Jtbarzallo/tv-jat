@@ -21,6 +21,19 @@ object Datos {
 
     const val LISTA_ECUADOR = "https://iptv-org.github.io/iptv/countries/ec.m3u"
     const val LISTA_ESPANOL = "https://iptv-org.github.io/iptv/languages/spa.m3u"
+
+    /** Listas gratis y legales en español latino (nombre → enlace). */
+    val LISTAS_LATINAS = listOf(
+        "🍿 Pluto TV México (cine, series, novelas)" to "https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_mx.m3u",
+        "🍿 Pluto TV Argentina" to "https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_ar.m3u",
+        "🍿 Pluto TV Chile" to "https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_cl.m3u",
+        "🇲🇽 Canales de México" to "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/mx.m3u",
+        "🇨🇴 Canales de Colombia" to "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/co.m3u",
+        "🇦🇷 Canales de Argentina" to "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ar.m3u",
+        "🇨🇱 Canales de Chile" to "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/cl.m3u",
+        "🇵🇪 Canales de Perú" to "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/pe.m3u",
+        "🇻🇪 Canales de Venezuela" to "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ve.m3u"
+    )
     private const val PREFS = "tvjat"
     private const val ARCHIVO_LISTA = "lista.m3u"
     const val NOMBRE_RESPALDO = "respaldo_tv_jat.json"
