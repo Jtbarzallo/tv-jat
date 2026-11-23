@@ -12,6 +12,12 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- Android Auto con imagen (TV JAT Video) -->
+    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+    <!-- GPS: tapa la imagen mientras el carro avanza (el sonido sigue) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- También se puede instalar directo en la Android TV (control remoto, sin pantalla táctil) -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -29,6 +35,10 @@
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
+
+        <meta-data
+            android:name="androidx.car.app.minCarApiLevel"
+            android:value="1" />
 
         <!-- Transmitir a la TV con Google Cast -->
         <meta-data
@@ -116,6 +126,18 @@
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaLibraryService" />
                 <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <!-- TV JAT Video en Android Auto: canales y películas CON IMAGEN (como Fermata Auto) -->
+        <service
+            android:name=".AutoVideoService"
+            android:exported="true"
+            android:label="TV JAT Video"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
             </intent-filter>
         </service>
     </application>

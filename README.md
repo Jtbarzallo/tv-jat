@@ -17,8 +17,10 @@ https://github.com/Jtbarzallo/tv-jat/releases/latest
   La TV descarga el canal sola; el celular puede apagar la pantalla y casi no gasta batería.
   También funciona con *Mis Películas* (el celular presta el archivo por el WiFi).
 - 📺 Se puede instalar **directo en la Android TV** (aparece en su pantalla de inicio).
-- 🚗 **Android Auto**: en el carro los canales se escuchan como radio (Android Auto no permite video).
-  Menú de Favoritos, Todos los canales y grupos, con búsqueda por voz.
+- 🚗 **Android Auto** (dos íconos en el carro):
+  - **TV JAT**: los canales se escuchan como radio (ahorra datos). Favoritos, grupos y búsqueda por voz.
+  - **TV JAT Video**: canales y *Mis Películas* **con imagen** en la pantalla del carro (como Fermata Auto).
+    Mientras el carro avanza la imagen se tapa y sigue el sonido (usa el GPS del celular).
   Como la app no viene de Play Store: en Android Auto → Ajustes → tocar 10 veces "Versión" →
   ⋮ Configuración para desarrolladores → activar **Fuentes desconocidas**.
 

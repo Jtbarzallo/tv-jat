@@ -27,11 +27,16 @@
       avance que lleva en la TV). TV JAT también se puede instalar directo en la Android TV.
 - [x] v1.7 (2026-11-23): Ver en TV: arreglo de "solo se oye, no se ve". Antes de enviar, la app revisa
       por dentro el canal (TS o fMP4) y se lo dice a la TV.
+- [x] v1.8 (2026-11-23): 🚗🖼️ "TV JAT Video" en Android Auto: canales y Mis Películas CON IMAGEN en
+      la pantalla del carro (mismo método que Fermata Auto: pantalla libre de las apps de navegación).
+      Botones Menú · anterior · pausa · siguiente (en películas: −10 s / +30 s). Menú: Favoritos, Todos,
+      por grupo, Mis Películas (seguir viendo, recientes, por carpeta) y Buscar. Sigue en el último canal.
+      Seguridad: con el GPS del celular, mientras el carro avanza la imagen se tapa y sigue el sonido.
+      Requisito: Android Auto → Ajustes de desarrollador → "Fuentes desconocidas".
 
 ## Pendiente / ideas
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
       permite); para esos, instalar TV JAT directo en la Android TV.
-- [ ] Android Auto: Mis Películas en el carro (solo sonido) si Jorge lo pide.
 - [ ] Mis Películas: subtítulos .srt con el mismo nombre del video.
 - [ ] Mis Películas: carátulas y sinopsis desde internet.
 - [ ] Guía de programación (EPG) si la lista trae `url-tvg`.
@@ -60,3 +65,7 @@
 - 2026-11-23: Jorge reporta que en la TV los canales solo se oyen, sin imagen. Causa: Google Cast supone
   otro formato de video si no se le dice; casi todos los canales M3U usan segmentos TS → v1.7 detecta
   el formato y lo envía. Sin datos nuevos que respaldar.
+- 2026-11-23: Jorge pregunta por Fermata Auto y pide "arreglar eso con TV JAT" (video en Android Auto) → v1.8
+  "TV JAT Video" (CarAppService de navegación que dibuja el video en la pantalla del carro). TV JAT (solo
+  sonido) sigue igual. Respaldo: el avance de las películas vistas en el carro va en "progresoPeliculas" y el
+  último canal en "ultimo" de respaldo_tv_jat.json; nada nuevo más.

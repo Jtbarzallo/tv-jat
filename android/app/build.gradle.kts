@@ -58,4 +58,7 @@ dependencies {
     // Transmitir a Android TV / Chromecast (Google Cast)
     implementation("com.google.android.gms:play-services-cast-framework:21.5.0")
     implementation("androidx.mediarouter:mediarouter:1.7.0")
+    // Android Auto con imagen (pantalla libre de las apps de navegación)
+    implementation("androidx.car.app:app:1.4.0")
+    implementation("androidx.lifecycle:lifecycle-common:2.6.2")
 }
