@@ -82,6 +82,7 @@ class AutoVideoService : CarAppService() {
 class SesionVideo : Session() {
     override fun onCreateScreen(intent: Intent): Screen {
         val tv = VideoCarro(carContext)
+        tv.arrancar()
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onDestroy(owner: LifecycleOwner) = tv.liberar()
         })
@@ -219,7 +220,10 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 } else ponerAviso("Este canal no responde")
             }
         })
+    }
 
+    /** Se llama cuando ya está todo listo (guardado del avance y GPS). */
+    fun arrancar() {
         main.postDelayed(guardadoPeriodico, 10_000)
         iniciarGps()
     }
