@@ -16,8 +16,13 @@
       celular, portada grande, filas "Seguir viendo", "Agregadas recientemente", por carpeta,
       "Ya vistas" y "Todas (A-Z)", buscador, títulos limpios; sigue donde se quedó, barra roja de
       avance, marcar vista/no vista, pasa sola al siguiente video de la carpeta (series).
+- [x] v1.5 (2026-11-22): 🚗 Android Auto: TV JAT aparece en el carro como app de audio; los canales
+      se escuchan como radio (sin imagen, ahorra datos). Menú: ★ Favoritos, 📺 Todos los canales y
+      un menú por grupo; logos de los canales; búsqueda y "Ok Google, pon … en TV JAT"; si un canal
+      no responde pasa solo al siguiente; al dar play sigue en el último canal visto.
 
 ## Pendiente / ideas
+- [ ] Android Auto: Mis Películas en el carro (solo sonido) si Jorge lo pide.
 - [ ] Mis Películas: subtítulos .srt con el mismo nombre del video.
 - [ ] Mis Películas: carátulas y sinopsis desde internet.
 - [ ] Guía de programación (EPG) si la lista trae `url-tvg`.
@@ -36,3 +41,7 @@
 - 2026-11-18: Jorge pide "algo así como Netflix pero con mis películas del celular" → v1.4.
   Respaldo: el avance de cada película (minuto, vista) va en respaldo_tv_jat.json
   ("progresoPeliculas", clave = nombre de archivo + tamaño, sobrevive a reinstalar).
+- 2026-11-22: Jorge pide que TV JAT funcione en Android Auto → v1.5. Android Auto no permite video
+  en la pantalla del carro (solo apps de audio), así que los canales se escuchan. Usa la misma lista,
+  favoritos y canales ocultos de la app; el último canal escuchado se guarda como "ultimo" (ya va en
+  respaldo_tv_jat.json). Sin datos nuevos que respaldar.

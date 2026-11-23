@@ -13,6 +13,10 @@ https://github.com/Jtbarzallo/tv-jat/releases/latest
 - Reproductor a pantalla completa: canal anterior/siguiente, ajustar/zoom/estirar imagen,
   ventanita flotante (PiP) al salir con el botón de inicio.
 - Respeta `User-Agent` y `Referer` de cada canal (`#EXTVLCOPT` o `url|User-Agent=…`).
+- 🚗 **Android Auto**: en el carro los canales se escuchan como radio (Android Auto no permite video).
+  Menú de Favoritos, Todos los canales y grupos, con búsqueda por voz.
+  Como la app no viene de Play Store: en Android Auto → Ajustes → tocar 10 veces "Versión" →
+  ⋮ Configuración para desarrolladores → activar **Fuentes desconocidas**.
 
 ## Respaldo (regla JAT)
 Todo se copia solo en **Descargas/TVJAT/respaldo_tv_jat.json** (lista completa, favoritos,

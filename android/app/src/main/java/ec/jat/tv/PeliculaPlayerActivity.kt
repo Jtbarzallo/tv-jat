@@ -45,6 +45,7 @@ class PeliculaPlayerActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (lista.isEmpty()) { finish(); return }
+        AutoService.pausarSiSuena()
 
         val raiz = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         vista = PlayerView(this).apply {

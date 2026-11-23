@@ -59,6 +59,7 @@ class PlayerActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (canales.isEmpty()) { finish(); return }
+        AutoService.pausarSiSuena()   // que no suenen dos canales a la vez
 
         val raiz = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         vista = PlayerView(this).apply {
