@@ -1,0 +1,57 @@
+name: Compilar TV JAT para PC
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "pc/**"
+      - ".github/workflows/pc.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: pc
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Instalar
+        run: npm install --no-audit --no-fund 2>&1 | tee ../build.log
+      - name: Compilar
+        run: |
+          set -o pipefail
+          npx electron-builder --win --publish never 2>&1 | tee -a ../build.log
+      - name: Publicar descarga
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: pc-v1.0.${{ github.run_number }}
+          name: TV JAT para PC v1.0.${{ github.run_number }}
+          body: |
+            TV JAT para PC (Windows).
+            - TVJAT-PC-Instalador.exe: se instala y deja el ícono en el escritorio y el menú Inicio.
+            - TVJAT-PC.exe: versión portátil, se abre sin instalar.
+          files: |
+            pc/dist/TVJAT-PC-Instalador.exe
+            pc/dist/TVJAT-PC.exe
+          make_latest: false
+      - name: Guardar registro si falla
+        if: failure()
+        working-directory: .
+        run: |
+          grep -iE "error|failed|cannot" -A3 build.log | head -150 > errores.txt || true
+          tail -80 build.log >> errores.txt || true
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git checkout --orphan registro-compilacion-pc
+          git rm -rf --cached . >/dev/null
+          git add -f errores.txt
+          git commit -m "Registro de la compilación PC ${{ github.run_number }}"
+          git push -f origin registro-compilacion-pc

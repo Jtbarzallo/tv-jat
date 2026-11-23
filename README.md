@@ -24,6 +24,15 @@ https://github.com/Jtbarzallo/tv-jat/releases/latest
   Como la app no viene de Play Store: en Android Auto → Ajustes → tocar 10 veces "Versión" →
   ⋮ Configuración para desarrolladores → activar **Fuentes desconocidas**.
 
+## 💻 TV JAT para PC (Windows)
+Descarga en **Releases** la versión `pc-v1.0.N`:
+- **TVJAT-PC-Instalador.exe**: se instala con ícono en el escritorio y el menú Inicio.
+- **TVJAT-PC.exe**: portátil, se abre sin instalar.
+
+Tiene canales (listas, grupos, favoritos, buscador, revisión) y Mis Películas (carpetas del PC).
+Teclas: ↑/↓ cambiar canal · Espacio pausa · F pantalla completa · C lista de canales · Ctrl+F buscar.
+Respaldo automático en **Documentos\TVJAT\respaldo_tv_jat.json** (mismo formato que el del celular).
+
 ## Respaldo (regla JAT)
 Todo se copia solo en **Descargas/TVJAT/respaldo_tv_jat.json** (lista completa, favoritos,
 listas usadas y último canal). Si se desinstala la app: ⋮ → *Recuperar respaldo…*

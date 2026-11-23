@@ -36,6 +36,11 @@
 - [x] v1.9 (2026-11-23): 👥 "Modo pasajero" en TV JAT Video (activado de fábrica): la imagen se ve también
       con el carro en marcha (el video es para los pasajeros). Se apaga/enciende en Menú → Modo pasajero;
       apagado, vuelve a tapar la imagen al avanzar (GPS).
+- [x] PC v1.0 (2026-11-23): 💻 TV JAT para PC (Windows, carpeta pc/, programa Electron): canales con lista,
+      grupos, favoritos, buscador, revisión de canales, menú de listas (Ecuador, español, latinas, archivo,
+      enlace, recientes), reproductor HLS/TS con panel ☰ Canales y pantalla completa, teclado (↑/↓ canal,
+      Espacio pausa, F pantalla completa, C canales); Mis Películas con carpetas del PC, filas estilo Netflix,
+      sigue donde se quedó y pasa al siguiente capítulo. Instalador y versión portátil en Releases (pc-v1.0.N).
 
 ## Pendiente / ideas
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
@@ -44,6 +49,8 @@
 - [ ] Mis Películas: carátulas y sinopsis desde internet.
 - [ ] Guía de programación (EPG) si la lista trae `url-tvg`.
 - [ ] Varias listas guardadas a la vez (no solo la actual).
+- [ ] PC: portadas (cuadro del video) en Mis Películas; "Ver en TV" (Google Cast) desde el PC.
+- [ ] Sincronizar solo entre celular y PC (hoy se pasa con el archivo de respaldo).
 
 ## Bitácora
 - 2026-11-17: Creación de la app (pedido de Jorge: "app para reproducir m3u").
@@ -75,3 +82,7 @@
 - 2026-11-23: Jorge aclara que el video es para el pasajero (sus hijos) y decide que la imagen no se tape en
   marcha → v1.9 "Modo pasajero" activado de fábrica, con opción en el menú del carro. Respaldo: "modoPasajero"
   se guarda en respaldo_tv_jat.json.
+- 2026-11-23: Jorge pide que TV JAT funcione en PC → TV JAT para PC v1.0 (Windows). Respaldo: automático en
+  Documentos\TVJAT\respaldo_tv_jat.json, mismo formato que el del celular (se recupera uno en el otro con
+  💾 Respaldo → Recuperar); el avance de películas usa la misma clave (nombre + tamaño), así que una película
+  sigue en el mismo minuto si es el mismo archivo. Dato nuevo solo del PC: "pc.carpetas" (carpetas de películas).

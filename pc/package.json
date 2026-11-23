@@ -1,0 +1,41 @@
+{
+  "name": "tv-jat-pc",
+  "version": "1.0.0",
+  "description": "TV JAT para PC: canales M3U y Mis Películas",
+  "author": "Jorge (Jtbarzallo)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "hls.js": "^1.7.4",
+    "mpegts.js": "^1.8.2"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "ec.jat.tv.pc",
+    "productName": "TV JAT",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "icono.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "artifactName": "TVJAT-PC-Instalador.exe",
+      "shortcutName": "TV JAT"
+    },
+    "portable": {
+      "artifactName": "TVJAT-PC.exe"
+    }
+  }
+}

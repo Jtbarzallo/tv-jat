@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>TV JAT</title>
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<header>
+  <div class="marca">📺 TV JAT</div>
+  <nav>
+    <button id="tabCanales" class="tab activa">📺 Canales</button>
+    <button id="tabPelis" class="tab">🎬 Mis Películas</button>
+  </nav>
+  <div class="acciones">
+    <button id="btnListas">📋 Listas ▾</button>
+    <button id="btnRevisar">🩺 Revisar canales</button>
+    <button id="btnRespaldo">💾 Respaldo ▾</button>
+  </div>
+</header>
+
+<main>
+  <!-- ======================= CANALES ======================= -->
+  <section id="vistaCanales">
+    <aside id="lado">
+      <div class="infoLista" id="infoLista">Sin lista</div>
+      <input id="buscar" type="search" placeholder="🔍 Buscar canal (Ctrl+F)">
+      <select id="grupo"></select>
+      <div id="listaCanales" class="lista"></div>
+    </aside>
+    <div id="zonaVideo"></div>
+  </section>
+
+  <!-- ======================= PELÍCULAS ======================= -->
+  <section id="vistaPelis" class="oculta">
+    <div class="barraPelis">
+      <input id="buscarPeli" type="search" placeholder="🔍 Buscar película">
+      <button id="btnCarpeta">📁 Agregar carpeta de películas</button>
+      <button id="btnActualizarPelis">🔄 Actualizar</button>
+    </div>
+    <div id="carpetas" class="carpetas"></div>
+    <div id="filasPelis"></div>
+  </section>
+</main>
+
+<!-- Reproductor (se mueve a la zona de video o a pantalla grande de películas) -->
+<div id="reproductor">
+  <video id="video" controls autoplay></video>
+  <div id="tituloVideo" class="tituloVideo"></div>
+  <div id="avisoVideo" class="avisoVideo oculta"></div>
+  <div id="panelCanales" class="panelCanales oculta">
+    <div class="panelCab"><b>Canales</b><button id="cerrarPanel">✕</button></div>
+    <div id="panelLista" class="lista"></div>
+  </div>
+  <div class="controles">
+    <button id="cAnterior" title="Anterior (↑)">⏮</button>
+    <button id="cPausa" title="Pausa (Espacio)">⏯</button>
+    <button id="cSiguiente" title="Siguiente (↓)">⏭</button>
+    <button id="cPanel" title="Lista de canales">☰ Canales</button>
+    <button id="cCerrarPeli" class="oculta">✕ Volver a Mis Películas</button>
+    <span class="espacio"></span>
+    <button id="cFav" title="Favorito">☆</button>
+    <button id="cGrande" title="Pantalla completa (F)">⛶ Pantalla completa</button>
+  </div>
+</div>
+
+<div id="menu" class="menu oculta"></div>
+<div id="modal" class="modal oculta"><div class="caja" id="cajaModal"></div></div>
+<div id="toast" class="toast oculta"></div>
+
+<script src="node_modules/hls.js/dist/hls.min.js"></script>
+<script src="node_modules/mpegts.js/dist/mpegts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
