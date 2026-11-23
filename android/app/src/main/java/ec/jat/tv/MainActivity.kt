@@ -60,6 +60,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Registro.instalar(this)
         window.statusBarColor = FONDO
         window.navigationBarColor = FONDO
         construirPantalla()
@@ -226,7 +227,8 @@ class MainActivity : Activity() {
         menu.menu.add(0, 1, 0, "🔄 Actualizar la lista")
         menu.menu.add(0, 2, 1, "💾 Guardar respaldo como…")
         menu.menu.add(0, 3, 2, "♻️ Recuperar respaldo…")
-        menu.menu.add(0, 4, 3, "ℹ️ Acerca de")
+        menu.menu.add(0, 7, 3, "🔧 Diagnóstico Android Auto")
+        menu.menu.add(0, 4, 4, "ℹ️ Acerca de")
         menu.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> {
@@ -244,6 +246,7 @@ class MainActivity : Activity() {
                     type = "*/*"
                 }, PEDIR_IMPORTAR)
                 5 -> revisarCanales()
+                7 -> verDiagnostico()
                 6 -> {
                     Datos.setOcultarCaidos(this, !Datos.ocultarCaidos(this))
                     filtrar()
@@ -260,6 +263,30 @@ class MainActivity : Activity() {
             true
         }
         menu.show()
+    }
+
+    /** Muestra lo que pasó en Android Auto (para saber qué falla) y deja compartirlo. */
+    private fun verDiagnostico() {
+        val texto = "TV JAT " + packageManager.getPackageInfo(packageName, 0).versionName + "\n\n" + Registro.leer(this)
+        val vista = TextView(this).apply {
+            text = texto
+            setTextIsSelectable(true)
+            textSize = 14f
+            setPadding(40, 20, 40, 20)
+        }
+        val scroll = android.widget.ScrollView(this).apply { addView(vista) }
+        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+        AlertDialog.Builder(this)
+            .setTitle("🔧 Diagnóstico Android Auto")
+            .setView(scroll)
+            .setPositiveButton("Compartir") { _, _ ->
+                startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"; putExtra(Intent.EXTRA_TEXT, texto)
+                }, "Compartir diagnóstico"))
+            }
+            .setNeutralButton("Borrar") { _, _ -> Registro.borrar(this) }
+            .setNegativeButton("Cerrar", null)
+            .show()
     }
 
     private fun abrirArchivo() {

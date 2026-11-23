@@ -110,7 +110,7 @@ class AutoService : MediaLibraryService() {
                     .setTitle(c.nombre)
                     .setArtist(grupoDe(c))
                     .setStation(c.nombre)
-                    .setArtworkUri(if (c.logo.startsWith("http")) Uri.parse(c.logo) else null)
+                    .setArtworkUri(LogoProvider.uri(c.logo, c.nombre))
                     .setIsBrowsable(false).setIsPlayable(true)
                     .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION).build()
             )
@@ -173,6 +173,8 @@ class AutoService : MediaLibraryService() {
     override fun onCreate() {
         super.onCreate()
         instancia = this
+        Registro.instalar(this)
+        Registro.anotar(this, "🚗 Servicio de audio (TV JAT) iniciado. Canales en la lista: ${canales().size}")
         val http = DefaultHttpDataSource.Factory()
             .setUserAgent(Reproduccion.USER_AGENT)
             .setAllowCrossProtocolRedirects(true)
@@ -206,13 +208,21 @@ class AutoService : MediaLibraryService() {
                 val url = mediaItem?.mediaId?.substringAfterLast(SEP) ?: return
                 canalActual = listaActual.firstOrNull { it.url == url } ?: canales().firstOrNull { it.url == url }
                 Datos.guardarUltimo(this@AutoService, url)
+                Registro.anotar(this@AutoService, "▶ Canal: ${canalActual?.nombre ?: url}  ($url)")
             }
 
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) errorSeguidos = 0
+                val t = when (state) { Player.STATE_BUFFERING -> "cargando"; Player.STATE_READY -> "listo (debe sonar)"; Player.STATE_ENDED -> "terminó"; else -> "detenido" }
+                Registro.anotar(this@AutoService, "   estado: $t")
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                Registro.anotar(this@AutoService, if (isPlaying) "   🔊 sonando" else "   ⏸ sin sonar")
             }
 
             override fun onPlayerError(e: PlaybackException) {
+                Registro.anotar(this@AutoService, "   ⚠ error: ${e.errorCodeName} · ${e.cause?.message ?: e.message}")
                 val idx = player.currentMediaItemIndex
                 val actual = player.currentMediaItem
                 if (e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
@@ -270,7 +280,7 @@ class AutoService : MediaLibraryService() {
     private fun estilo(): LibraryParams = LibraryParams.Builder().setExtras(Bundle().apply {
         putBoolean("android.media.browse.CONTENT_STYLE_SUPPORTED", true)
         putInt("android.media.browse.CONTENT_STYLE_BROWSABLE_HINT", 1)
-        putInt("android.media.browse.CONTENT_STYLE_PLAYABLE_HINT", 2)
+        putInt("android.media.browse.CONTENT_STYLE_PLAYABLE_HINT", 1)   // lista: nombres completos y grandes
         putBoolean("android.media.browse.SEARCH_SUPPORTED", true)
     }).build()
 
@@ -278,8 +288,10 @@ class AutoService : MediaLibraryService() {
 
         override fun onGetLibraryRoot(
             session: MediaLibrarySession, browser: MediaSession.ControllerInfo, params: LibraryParams?
-        ): ListenableFuture<LibraryResult<MediaItem>> =
-            Futures.immediateFuture(LibraryResult.ofItem(raiz(), estilo()))
+        ): ListenableFuture<LibraryResult<MediaItem>> {
+            Registro.anotar(this@AutoService, "📡 Conectó: ${browser.packageName}")
+            return Futures.immediateFuture(LibraryResult.ofItem(raiz(), estilo()))
+        }
 
         override fun onGetItem(
             session: MediaLibrarySession, browser: MediaSession.ControllerInfo, mediaId: String
@@ -323,6 +335,7 @@ class AutoService : MediaLibraryService() {
             mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
             probadosHls.clear(); errorSeguidos = 0
+            Registro.anotar(this@AutoService, "👆 ${controller.packageName} pidió: " + mediaItems.joinToString { it.mediaId.substringAfterLast(SEP).ifEmpty { it.requestMetadata.searchQuery ?: "?" } })
             if (mediaItems.size == 1) {
                 // "Ok Google, pon Ecuavisa en TV JAT"
                 val consulta = mediaItems[0].requestMetadata.searchQuery
@@ -333,6 +346,7 @@ class AutoService : MediaLibraryService() {
                     return Futures.immediateFuture(MediaSession.MediaItemsWithStartPosition(lista, 0, C.TIME_UNSET))
                 }
                 val r = resolver(mediaItems[0].mediaId)
+                if (r == null) Registro.anotar(this@AutoService, "   ⚠ no encontré ese canal en la lista")
                 if (r != null) return Futures.immediateFuture(MediaSession.MediaItemsWithStartPosition(r.first, r.second, C.TIME_UNSET))
             }
             val salida = mediaItems.mapNotNull { mi ->

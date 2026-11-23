@@ -45,6 +45,11 @@
       TextureView (antes PlayerView/SurfaceView, que en la pantalla del carro quedaba negra). Nuevas opciones
       en Menú: "Forma de imagen" A (ajustada) / B (directa al carro) y "Diagnóstico" (pantalla, forma, video,
       estado, error) para saber qué falla sin adivinar.
+- [x] v1.11 (2026-11-23): Android Auto (TV JAT radio): los logos salían como triángulos ⚠ porque el carro no
+      baja imágenes de internet → nuevo LogoProvider que las baja y entrega al carro (si no hay logo, dibuja
+      las iniciales del canal). Canales en lista (nombres completos) en vez de cuadritos.
+      🔧 Diagnóstico Android Auto en el celular (⋮): anota qué pide el carro, qué canal, estado, errores y
+      cierres inesperados de la app; se puede compartir.
 
 ## Pendiente / ideas
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
@@ -92,3 +97,6 @@
   sigue en el mismo minuto si es el mismo archivo. Dato nuevo solo del PC: "pc.carpetas" (carpetas de películas).
 - 2026-11-23: Jorge reporta que en el carro se oye pero no se ve (también estacionado). Cambio a TextureView,
   forma B de respaldo y diagnóstico. Respaldo: "formaImagen" va en respaldo_tv_jat.json.
+- 2026-11-23: Jorge manda foto: en el carro (TV JAT radio) los logos salen ⚠ y al tocar no suena nada. Arreglo de
+  logos + diagnóstico para ver la causa exacta del silencio. Respaldo: sin datos nuevos (el diagnóstico es
+  solo un registro temporal).

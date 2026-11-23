@@ -83,6 +83,8 @@ class AutoVideoService : CarAppService() {
 
 class SesionVideo : Session() {
     override fun onCreateScreen(intent: Intent): Screen {
+        Registro.instalar(carContext)
+        Registro.anotar(carContext, "🖼️ TV JAT Video abierto en el carro (nivel ${carContext.carAppApiLevel})")
         val tv = VideoCarro(carContext)
         tv.arrancar()
         lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -181,6 +183,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                     canalActual = c
                     Datos.guardarUltimo(ctx, c.url)
                     mostrarTitulo(c.nombre)
+                    Registro.anotar(ctx, "▶ (video) Canal: ${c.nombre}  (${c.url})")
                 } else {
                     val p = pelisLista.getOrNull(i) ?: return
                     // terminó la anterior y pasó sola a la siguiente (series)
@@ -203,6 +206,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             }
 
             override fun onPlaybackStateChanged(state: Int) {
+                Registro.anotar(ctx, "   (video) estado: " + when (state) { Player.STATE_BUFFERING -> "cargando"; Player.STATE_READY -> "listo"; Player.STATE_ENDED -> "terminó"; else -> "detenido" })
                 when (state) {
                     Player.STATE_READY -> { errorSeguidos = 0; ponerAviso("") }
                     Player.STATE_BUFFERING -> ponerAviso("Cargando…")
@@ -215,12 +219,14 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             }
 
             override fun onVideoSizeChanged(vs: VideoSize) {
+                Registro.anotar(ctx, "   🖼️ tamaño del video: ${vs.width}x${vs.height}")
                 dVideo = if (vs.width > 0) "${vs.width}x${vs.height}" else "sin imagen (solo sonido)"
                 if (vs.width > 0 && vs.height > 0) vista?.setAspectRatio(vs.width * vs.pixelWidthHeightRatio / vs.height)
             }
 
             override fun onPlayerError(e: PlaybackException) {
                 dError = e.errorCodeName
+                Registro.anotar(ctx, "   ⚠ video error: ${e.errorCodeName} · ${e.cause?.message ?: e.message}")
                 val idx = player.currentMediaItemIndex
                 val actual = player.currentMediaItem
                 if (e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
@@ -403,6 +409,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         }
         aplicarArea()
         aplicarMovimiento()
+        Registro.anotar(ctx, "   pantalla del carro: $dPantalla · forma $dForma")
     }
 
     override fun onVisibleAreaChanged(visibleArea: Rect) {
