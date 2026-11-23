@@ -25,6 +25,8 @@
       y puede apagar la pantalla). Capa de control: anterior/siguiente, lista de canales, pausa, volver
       al celular. Películas: el celular las presta por el WiFi y siguen desde donde iban (se guarda el
       avance que lleva en la TV). TV JAT también se puede instalar directo en la Android TV.
+- [x] v1.7 (2026-11-23): Ver en TV: arreglo de "solo se oye, no se ve". Antes de enviar, la app revisa
+      por dentro el canal (TS o fMP4) y se lo dice a la TV.
 
 ## Pendiente / ideas
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
@@ -55,3 +57,6 @@
 - 2026-11-22: Jorge pide que TV JAT se transmita a la Android TV sin que el celular sufra con la
   batería → v1.6 con Google Cast (la TV descarga el canal; el celular no). Respaldo: el avance de las
   películas vistas en la TV se guarda en "progresoPeliculas" de respaldo_tv_jat.json; nada nuevo más.
+- 2026-11-23: Jorge reporta que en la TV los canales solo se oyen, sin imagen. Causa: Google Cast supone
+  otro formato de video si no se le dice; casi todos los canales M3U usan segmentos TS → v1.7 detecta
+  el formato y lo envía. Sin datos nuevos que respaldar.

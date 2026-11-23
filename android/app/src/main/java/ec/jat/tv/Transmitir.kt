@@ -11,7 +11,14 @@ import android.widget.ArrayAdapter
 import android.widget.TextView
 import android.widget.Toast
 import androidx.mediarouter.media.MediaRouter
+import android.os.Handler
+import android.os.Looper
 import com.google.android.gms.cast.CastMediaControlIntent
+import com.google.android.gms.cast.HlsSegmentFormat
+import com.google.android.gms.cast.HlsVideoSegmentFormat
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.concurrent.thread
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadRequestData
 import com.google.android.gms.cast.MediaMetadata
@@ -171,24 +178,78 @@ object Transmitir {
     }
 
     /** Manda un video a la TV. [fallo] se llama si la TV no lo pudo abrir. */
+    /**
+     * Revisa por dentro un canal HLS para decirle a la TV qué tipo de video trae.
+     * Sin esto, Google Cast supone otro formato y en muchos canales solo se oye el audio (sin imagen).
+     * Devuelve "ts" (lo más común en canales M3U), "fmp4", o null si no se pudo saber.
+     */
+    private fun formatoHls(url: String, ua: String, referer: String): String? {
+        fun bajar(u: String): String? = try {
+            val con = URL(u).openConnection() as HttpURLConnection
+            con.connectTimeout = 8000; con.readTimeout = 10000
+            con.instanceFollowRedirects = true
+            con.setRequestProperty("User-Agent", ua.ifEmpty { Reproduccion.USER_AGENT })
+            if (referer.isNotEmpty()) con.setRequestProperty("Referer", referer)
+            if (con.responseCode in 200..299) con.inputStream.bufferedReader().use { r ->
+                val sb = StringBuilder(); var n = 0
+                while (n < 400) { val l = r.readLine() ?: break; sb.append(l).append('\n'); n++ }
+                sb.toString()
+            } else null
+        } catch (e: Throwable) { null }
+
+        var actual = url
+        var texto = bajar(actual) ?: return null
+        // lista principal: entrar a la primera calidad
+        if (texto.contains("#EXT-X-STREAM-INF")) {
+            val lineas = texto.lines().map { it.trim() }
+            val i = lineas.indexOfFirst { it.startsWith("#EXT-X-STREAM-INF") }
+            val variante = lineas.drop(i + 1).firstOrNull { it.isNotEmpty() && !it.startsWith("#") } ?: return "ts"
+            actual = URL(URL(actual), variante).toString()
+            texto = bajar(actual) ?: return "ts"
+        }
+        if (texto.contains("#EXT-X-MAP")) return "fmp4"
+        val segmento = texto.lines().map { it.trim() }.firstOrNull { it.isNotEmpty() && !it.startsWith("#") }?.lowercase() ?: return "ts"
+        val ruta = segmento.substringBefore('?')
+        return if (ruta.endsWith(".m4s") || ruta.endsWith(".mp4") || ruta.endsWith(".m4v") || ruta.endsWith(".cmfv")) "fmp4" else "ts"
+    }
+
+    /** Manda un video a la TV. [fallo] se llama si la TV no lo pudo abrir. */
     fun enviar(
         ctx: Context, url: String, titulo: String, subtitulo: String, imagen: String,
-        tipo: String, enVivo: Boolean, desdeMs: Long = 0L, fallo: (String) -> Unit
+        tipo: String, enVivo: Boolean, desdeMs: Long = 0L,
+        ua: String = "", referer: String = "", fallo: (String) -> Unit
     ): Boolean {
-        val rmc = sesion(ctx)?.remoteMediaClient ?: return false
+        if (sesion(ctx)?.remoteMediaClient == null) return false
+        val principal = Handler(Looper.getMainLooper())
+        thread(isDaemon = true) {
+            val formato = if (tipo == "application/x-mpegURL") formatoHls(url, ua, referer) else null
+            principal.post { cargar(ctx, url, titulo, subtitulo, imagen, tipo, enVivo, desdeMs, formato, fallo) }
+        }
+        return true
+    }
+
+    private fun cargar(
+        ctx: Context, url: String, titulo: String, subtitulo: String, imagen: String,
+        tipo: String, enVivo: Boolean, desdeMs: Long, formato: String?, fallo: (String) -> Unit
+    ) {
+        val rmc = sesion(ctx)?.remoteMediaClient ?: return
         val meta = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
             putString(MediaMetadata.KEY_TITLE, titulo)
             if (subtitulo.isNotEmpty()) putString(MediaMetadata.KEY_SUBTITLE, subtitulo)
             if (imagen.startsWith("http")) addImage(WebImage(Uri.parse(imagen)))
         }
-        val info = MediaInfo.Builder(url)
+        val b = MediaInfo.Builder(url)
             .setContentUrl(url)
             .setStreamType(if (enVivo) MediaInfo.STREAM_TYPE_LIVE else MediaInfo.STREAM_TYPE_BUFFERED)
             .setContentType(tipo)
             .setMetadata(meta)
-            .build()
+        // decirle a la TV el tipo de video y audio del canal (si no, a veces solo suena el audio)
+        when (formato) {
+            "ts" -> b.setHlsSegmentFormat(HlsSegmentFormat.TS).setHlsVideoSegmentFormat(HlsVideoSegmentFormat.MPEG2_TS)
+            "fmp4" -> b.setHlsSegmentFormat(HlsSegmentFormat.FMP4).setHlsVideoSegmentFormat(HlsVideoSegmentFormat.FMP4)
+        }
         val pedido = MediaLoadRequestData.Builder()
-            .setMediaInfo(info)
+            .setMediaInfo(b.build())
             .setAutoplay(true)
             .setCurrentTime(desdeMs)
             .build()
@@ -198,9 +259,7 @@ object Transmitir {
             }
         } catch (e: Throwable) {
             fallo("No se pudo enviar a la TV.")
-            return false
         }
-        return true
     }
 
     fun pausarOSeguir(ctx: Context) {

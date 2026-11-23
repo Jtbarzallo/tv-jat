@@ -340,7 +340,8 @@ class PlayerActivity : Activity() {
         val p = player ?: return
         val c = canales.getOrNull(p.currentMediaItemIndex) ?: return
         textoTv.text = "📡 En ${Transmitir.nombreTv(this)}:\n${c.nombre}   ${p.currentMediaItemIndex + 1}/${canales.size}"
-        val ok = Transmitir.enviar(this, c.url, c.nombre, c.grupo, c.logo, Transmitir.tipoDe(c.url), true) { msg ->
+        val ok = Transmitir.enviar(this, c.url, c.nombre, c.grupo, c.logo, Transmitir.tipoDe(c.url), true,
+            ua = c.userAgent, referer = c.referer) { msg ->
             runOnUiThread {
                 if (enTv && canalActual?.url == c.url)
                     textoTv.text = "😕 $msg\nEste canal no deja verse en la TV. Prueba con Siguiente ▶"
