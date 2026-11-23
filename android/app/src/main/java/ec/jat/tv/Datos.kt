@@ -108,6 +108,14 @@ object Datos {
         guardarRespaldo(ctx)
     }
 
+    // ---------- Android Auto con imagen: modo pasajero ----------
+    /** true = la imagen se ve también con el carro en marcha (decisión de Jorge: el video es para el pasajero). */
+    fun modoPasajero(ctx: Context) = prefs(ctx).getBoolean("modoPasajero", true)
+    fun setModoPasajero(ctx: Context, v: Boolean) {
+        prefs(ctx).edit().putBoolean("modoPasajero", v).apply()
+        guardarRespaldo(ctx)
+    }
+
     // ---------- último canal ----------
     fun ultimo(ctx: Context): String = prefs(ctx).getString("ultimo", "") ?: ""
     fun guardarUltimo(ctx: Context, url: String) {
@@ -127,6 +135,7 @@ object Datos {
         .put("caidos", JSONArray(caidos(ctx).toList()))
         .put("fechaRevision", fechaRevision(ctx))
         .put("ocultarCaidos", ocultarCaidos(ctx))
+        .put("modoPasajero", modoPasajero(ctx))
         .put("progresoPeliculas", Peliculas.progresoJson(ctx))
         .put("listaM3u", textoLista(ctx) ?: "")
         .toString(2)
@@ -155,6 +164,7 @@ object Datos {
             .putString("caidos", (json.optJSONArray("caidos") ?: JSONArray()).toString())
             .putString("fechaRevision", json.optString("fechaRevision", ""))
             .putBoolean("ocultarCaidos", json.optBoolean("ocultarCaidos", true))
+            .putBoolean("modoPasajero", json.optBoolean("modoPasajero", true))
             .apply()
         Peliculas.importar(ctx, json.optJSONObject("progresoPeliculas"))
         guardarRespaldo(ctx)

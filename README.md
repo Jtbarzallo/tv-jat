@@ -20,7 +20,7 @@ https://github.com/Jtbarzallo/tv-jat/releases/latest
 - 🚗 **Android Auto** (dos íconos en el carro):
   - **TV JAT**: los canales se escuchan como radio (ahorra datos). Favoritos, grupos y búsqueda por voz.
   - **TV JAT Video**: canales y *Mis Películas* **con imagen** en la pantalla del carro (como Fermata Auto).
-    Mientras el carro avanza la imagen se tapa y sigue el sonido (usa el GPS del celular).
+    Modo pasajero (activado): la imagen se ve también en marcha. Se puede apagar en Menú → Modo pasajero.
   Como la app no viene de Play Store: en Android Auto → Ajustes → tocar 10 veces "Versión" →
   ⋮ Configuración para desarrolladores → activar **Fuentes desconocidas**.
 

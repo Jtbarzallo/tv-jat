@@ -501,6 +501,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     private fun iniciarGps() {
         if (!tienePermisoGps()) {
+            if (Datos.modoPasajero(ctx)) { aplicarMovimiento(); return }   // no hace falta el GPS
             enMovimiento = true
             aplicarMovimiento()
             try {
@@ -522,7 +523,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     /** Mientras el carro avanza: imagen tapada, el sonido sigue. */
     private fun aplicarMovimiento() {
-        val tapar = enMovimiento
+        val tapar = enMovimiento && !Datos.modoPasajero(ctx)
         avisoFijo = when {
             !tapar -> ""
             !tienePermisoGps() -> "🔒 Para ver la imagen, acepta en el celular el permiso de ubicación de TV JAT\n(sirve para tapar la imagen mientras manejas).\nEl sonido sigue."
@@ -544,6 +545,13 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             vista?.visibility = if (tapar) View.INVISIBLE else View.VISIBLE
         }
         pintarAviso()
+    }
+
+    /** Activa/desactiva el modo pasajero desde el menú del carro. */
+    fun cambiarModoPasajero() {
+        val nuevo = !Datos.modoPasajero(ctx)
+        Datos.setModoPasajero(ctx, nuevo)
+        if (!nuevo) iniciarGps() else aplicarMovimiento()
     }
 
     fun liberar() {
@@ -636,6 +644,12 @@ class PantallaMenu(ctx: CarContext, tv: VideoCarro) : PantallaFilas(ctx, "TV JAT
     l.add(Fila("📂 Canales por grupo", "", true) { tv.irA(pantallaGrupos(ctx, tv)) })
     l.add(Fila("🎬 Mis Películas", "Videos guardados en el celular", true) { tv.irA(pantallaPeliculas(ctx, tv)) })
     l.add(Fila("🔍 Buscar canal") { tv.irA(PantallaBuscar(ctx, tv)) })
+    val pasajero = Datos.modoPasajero(ctx)
+    l.add(Fila(
+        if (pasajero) "👥 Modo pasajero: ACTIVADO" else "👥 Modo pasajero: desactivado",
+        if (pasajero) "La imagen se ve con el carro en marcha. Toca para taparla al avanzar"
+        else "La imagen se tapa al avanzar. Toca para verla siempre"
+    ) { tv.cambiarModoPasajero(); tv.volverAlVideo() })
     l
 })
 

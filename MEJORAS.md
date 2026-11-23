@@ -33,6 +33,9 @@
       por grupo, Mis Películas (seguir viendo, recientes, por carpeta) y Buscar. Sigue en el último canal.
       Seguridad: con el GPS del celular, mientras el carro avanza la imagen se tapa y sigue el sonido.
       Requisito: Android Auto → Ajustes de desarrollador → "Fuentes desconocidas".
+- [x] v1.9 (2026-11-23): 👥 "Modo pasajero" en TV JAT Video (activado de fábrica): la imagen se ve también
+      con el carro en marcha (el video es para los pasajeros). Se apaga/enciende en Menú → Modo pasajero;
+      apagado, vuelve a tapar la imagen al avanzar (GPS).
 
 ## Pendiente / ideas
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
@@ -69,3 +72,6 @@
   "TV JAT Video" (CarAppService de navegación que dibuja el video en la pantalla del carro). TV JAT (solo
   sonido) sigue igual. Respaldo: el avance de las películas vistas en el carro va en "progresoPeliculas" y el
   último canal en "ultimo" de respaldo_tv_jat.json; nada nuevo más.
+- 2026-11-23: Jorge aclara que el video es para el pasajero (sus hijos) y decide que la imagen no se tape en
+  marcha → v1.9 "Modo pasajero" activado de fábrica, con opción en el menú del carro. Respaldo: "modoPasajero"
+  se guarda en respaldo_tv_jat.json.
