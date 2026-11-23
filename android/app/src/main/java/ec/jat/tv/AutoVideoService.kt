@@ -59,7 +59,9 @@ import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
+import androidx.media3.common.VideoSize
+import android.view.TextureView
+import android.view.WindowManager
 import java.io.File
 
 /**
@@ -114,13 +116,31 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     private var superficie: Surface? = null
     private var ancho = 0
     private var alto = 0
+    private var dpiCarro = 160
     private var area: Rect? = null
     private var vd: VirtualDisplay? = null
     private var pres: Presentation? = null
-    private var vista: PlayerView? = null
+    private var vista: AspectRatioFrameLayout? = null   // marco que respeta la forma del video
+    private var textura: TextureView? = null
     private var titulo: TextView? = null
     private var aviso: TextView? = null
     private var directa = false     // si no se pudo armar la pantalla, el video va directo
+
+    // diagnóstico (se ve en Menú → Diagnóstico)
+    private var dPantalla = "todavía no llega"
+    private var dForma = "-"
+    private var dVideo = "sin imagen todavía"
+    private var dError = ""
+    fun diagnostico(): String {
+        val est = when (player.playbackState) {
+            Player.STATE_READY -> if (player.isPlaying) "reproduciendo" else "en pausa"
+            Player.STATE_BUFFERING -> "cargando"
+            Player.STATE_ENDED -> "terminó"
+            else -> "detenido"
+        }
+        return "Pantalla del carro: $dPantalla · Forma $dForma · Video: $dVideo · Estado: $est" +
+            (if (dError.isNotEmpty()) " · Error: $dError" else "")
+    }
 
     // seguridad: carro avanzando
     var enMovimiento = true
@@ -194,7 +214,13 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 }
             }
 
+            override fun onVideoSizeChanged(vs: VideoSize) {
+                dVideo = if (vs.width > 0) "${vs.width}x${vs.height}" else "sin imagen (solo sonido)"
+                if (vs.width > 0 && vs.height > 0) vista?.setAspectRatio(vs.width * vs.pixelWidthHeightRatio / vs.height)
+            }
+
             override fun onPlayerError(e: PlaybackException) {
+                dError = e.errorCodeName
                 val idx = player.currentMediaItemIndex
                 val actual = player.currentMediaItem
                 if (e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
@@ -353,21 +379,27 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     override fun onSurfaceAvailable(sc: SurfaceContainer) {
         val s = sc.surface ?: return
         liberarPantalla()
-        superficie = s; ancho = sc.width; alto = sc.height
-        try {
+        superficie = s; ancho = sc.width; alto = sc.height; dpiCarro = sc.dpi
+        dPantalla = "${sc.width}x${sc.height}"
+        if (Datos.formaImagen(ctx) == "B") {
+            directa = true; dForma = "B (directa)"
+        } else try {
             val dm = ctx.getSystemService(DisplayManager::class.java)
             val d = dm.createVirtualDisplay("TV JAT Video", sc.width, sc.height, sc.dpi, s, 0)
             vd = d
             val p = Presentation(ctx, d.display, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+            p.window?.setFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED, WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
             p.setContentView(armarVista(p.context))
             p.show()
             pres = p
             directa = false
+            dForma = "A (ajustada)"
         } catch (e: Exception) {
             // Plan B: el video va directo a la pantalla (puede verse algo estirado)
             liberarPantalla()
-            superficie = s
+            superficie = s; ancho = sc.width; alto = sc.height
             directa = true
+            dForma = "B (A falló: ${e.javaClass.simpleName})"
         }
         aplicarArea()
         aplicarMovimiento()
@@ -392,14 +424,14 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     private fun armarVista(c: android.content.Context): View {
         val raiz = FrameLayout(c).apply { setBackgroundColor(Color.BLACK) }
-        val pv = PlayerView(c).apply {
-            useController = false
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-            setShutterBackgroundColor(Color.BLACK)
-            setKeepContentOnPlayerReset(true)
-            player = this@VideoCarro.player
-        }
-        raiz.addView(pv, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        val marco = AspectRatioFrameLayout(c).apply { resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT }
+        val tx = TextureView(c)
+        marco.addView(tx, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        raiz.addView(marco, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER))
+        val vs = player.videoSize
+        if (vs.width > 0 && vs.height > 0) marco.setAspectRatio(vs.width * vs.pixelWidthHeightRatio / vs.height)
+        player.setVideoTextureView(tx)
+        textura = tx
         val t = TextView(c).apply {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
@@ -417,7 +449,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             visibility = View.GONE
         }
         raiz.addView(a, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
-        vista = pv; titulo = t; aviso = a
+        vista = marco; titulo = t; aviso = a
         return raiz
     }
 
@@ -438,7 +470,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     }
 
     private fun liberarPantalla() {
-        vista?.player = null
+        textura?.let { player.clearVideoTextureView(it) }
+        textura = null
         try { pres?.dismiss() } catch (e: Exception) {}
         try { vd?.release() } catch (e: Exception) {}
         if (directa) player.clearVideoSurface()
@@ -554,6 +587,14 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         if (!nuevo) iniciarGps() else aplicarMovimiento()
     }
 
+    /** Cambia entre la forma A (ajustada) y B (directa) de mostrar la imagen. */
+    fun cambiarFormaImagen() {
+        Datos.setFormaImagen(ctx, if (Datos.formaImagen(ctx) == "B") "A" else "B")
+        val s = superficie ?: return
+        val sc = SurfaceContainer(s, ancho, alto, dpiCarro)
+        onSurfaceAvailable(sc)
+    }
+
     fun liberar() {
         guardarAvance(true)
         main.removeCallbacksAndMessages(null)
@@ -650,6 +691,12 @@ class PantallaMenu(ctx: CarContext, tv: VideoCarro) : PantallaFilas(ctx, "TV JAT
         if (pasajero) "La imagen se ve con el carro en marcha. Toca para taparla al avanzar"
         else "La imagen se tapa al avanzar. Toca para verla siempre"
     ) { tv.cambiarModoPasajero(); tv.volverAlVideo() })
+    val forma = Datos.formaImagen(ctx)
+    l.add(Fila(
+        if (forma == "B") "🖼️ Forma de imagen: B (directa)" else "🖼️ Forma de imagen: A (ajustada)",
+        "Si no se ve la imagen, toca para probar la otra forma"
+    ) { tv.cambiarFormaImagen(); tv.volverAlVideo() })
+    l.add(Fila("🔧 Diagnóstico", tv.diagnostico()) { tv.volverAlVideo() })
     l
 })
 

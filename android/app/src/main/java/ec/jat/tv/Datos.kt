@@ -116,6 +116,13 @@ object Datos {
         guardarRespaldo(ctx)
     }
 
+    /** Forma de mostrar la imagen en el carro: "A" ajustada (por defecto) o "B" directa. */
+    fun formaImagen(ctx: Context) = prefs(ctx).getString("formaImagen", "A") ?: "A"
+    fun setFormaImagen(ctx: Context, v: String) {
+        prefs(ctx).edit().putString("formaImagen", v).apply()
+        guardarRespaldo(ctx)
+    }
+
     // ---------- último canal ----------
     fun ultimo(ctx: Context): String = prefs(ctx).getString("ultimo", "") ?: ""
     fun guardarUltimo(ctx: Context, url: String) {
@@ -136,6 +143,7 @@ object Datos {
         .put("fechaRevision", fechaRevision(ctx))
         .put("ocultarCaidos", ocultarCaidos(ctx))
         .put("modoPasajero", modoPasajero(ctx))
+        .put("formaImagen", formaImagen(ctx))
         .put("progresoPeliculas", Peliculas.progresoJson(ctx))
         .put("listaM3u", textoLista(ctx) ?: "")
         .toString(2)
@@ -165,6 +173,7 @@ object Datos {
             .putString("fechaRevision", json.optString("fechaRevision", ""))
             .putBoolean("ocultarCaidos", json.optBoolean("ocultarCaidos", true))
             .putBoolean("modoPasajero", json.optBoolean("modoPasajero", true))
+            .putString("formaImagen", json.optString("formaImagen", "A"))
             .apply()
         Peliculas.importar(ctx, json.optJSONObject("progresoPeliculas"))
         guardarRespaldo(ctx)

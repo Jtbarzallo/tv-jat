@@ -41,6 +41,10 @@
       enlace, recientes), reproductor HLS/TS con panel ☰ Canales y pantalla completa, teclado (↑/↓ canal,
       Espacio pausa, F pantalla completa, C canales); Mis Películas con carpetas del PC, filas estilo Netflix,
       sigue donde se quedó y pasa al siguiente capítulo. Instalador y versión portátil en Releases (pc-v1.0.N).
+- [x] v1.10 (2026-11-23): arreglo TV JAT Video "se oye pero no se ve": la imagen ahora se dibuja con
+      TextureView (antes PlayerView/SurfaceView, que en la pantalla del carro quedaba negra). Nuevas opciones
+      en Menú: "Forma de imagen" A (ajustada) / B (directa al carro) y "Diagnóstico" (pantalla, forma, video,
+      estado, error) para saber qué falla sin adivinar.
 
 ## Pendiente / ideas
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
@@ -86,3 +90,5 @@
   Documentos\TVJAT\respaldo_tv_jat.json, mismo formato que el del celular (se recupera uno en el otro con
   💾 Respaldo → Recuperar); el avance de películas usa la misma clave (nombre + tamaño), así que una película
   sigue en el mismo minuto si es el mismo archivo. Dato nuevo solo del PC: "pc.carpetas" (carpetas de películas).
+- 2026-11-23: Jorge reporta que en el carro se oye pero no se ve (también estacionado). Cambio a TextureView,
+  forma B de respaldo y diagnóstico. Respaldo: "formaImagen" va en respaldo_tv_jat.json.
