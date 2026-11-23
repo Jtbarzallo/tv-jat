@@ -13,6 +13,10 @@ https://github.com/Jtbarzallo/tv-jat/releases/latest
 - Reproductor a pantalla completa: canal anterior/siguiente, ajustar/zoom/estirar imagen,
   ventanita flotante (PiP) al salir con el botón de inicio.
 - Respeta `User-Agent` y `Referer` de cada canal (`#EXTVLCOPT` o `url|User-Agent=…`).
+- 📡 **Ver en TV** (Android TV / Chromecast): en el reproductor toca *📡 Ver en TV* y elige la TV.
+  La TV descarga el canal sola; el celular puede apagar la pantalla y casi no gasta batería.
+  También funciona con *Mis Películas* (el celular presta el archivo por el WiFi).
+- 📺 Se puede instalar **directo en la Android TV** (aparece en su pantalla de inicio).
 - 🚗 **Android Auto**: en el carro los canales se escuchan como radio (Android Auto no permite video).
   Menú de Favoritos, Todos los canales y grupos, con búsqueda por voz.
   Como la app no viene de Play Store: en Android Auto → Ajustes → tocar 10 veces "Versión" →

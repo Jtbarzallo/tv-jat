@@ -12,6 +12,7 @@ import android.util.Rational
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.media3.common.MediaItem
@@ -29,6 +30,16 @@ class PeliculaPlayerActivity : Activity() {
     private lateinit var vista: PlayerView
     private lateinit var btnTamano: TextView
     private lateinit var titulo: TextView
+    private lateinit var btnTv: TextView
+    private lateinit var capaTv: LinearLayout
+    private lateinit var textoTv: TextView
+    /** true mientras la película se ve en la TV. */
+    private var enTv = false
+    private val oyenteTv = object : OyenteTv() {
+        override fun onSessionEnded(s: com.google.android.gms.cast.framework.CastSession, error: Int) {
+            if (enTv) salirDeTv(volverAlCelular = false, cerrarSesion = false)
+        }
+    }
     private val lista = CineEstado.lista
     private val manejador = Handler(Looper.getMainLooper())
     private var modoTamano = 0
@@ -56,6 +67,7 @@ class PeliculaPlayerActivity : Activity() {
             setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { v ->
                 btnTamano.visibility = v
                 titulo.visibility = v
+                if (::btnTv.isInitialized && !Transmitir.esTv(this@PeliculaPlayerActivity)) btnTv.visibility = v
             })
         }
         raiz.addView(vista, FrameLayout.LayoutParams(-1, -1))
@@ -81,6 +93,49 @@ class PeliculaPlayerActivity : Activity() {
         raiz.addView(btnTamano, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
             setMargins(dp(16), dp(16), dp(16), 0)
         })
+
+        btnTv = TextView(this).apply {
+            text = "📡 Ver en TV"
+            setTextColor(Color.WHITE)
+            textSize = 15f
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            background = GradientDrawable().apply { setColor(0xAA000000.toInt()); cornerRadius = dp(10).toFloat() }
+            visibility = if (Transmitir.esTv(this@PeliculaPlayerActivity)) View.GONE else View.VISIBLE
+            setOnClickListener { Transmitir.elegirTv(this@PeliculaPlayerActivity) { pasarATv() } }
+        }
+        raiz.addView(btnTv, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
+            setMargins(dp(16), dp(64), dp(16), 0)
+        })
+
+        capaTv = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setBackgroundColor(0xF20B0B0F.toInt())
+            visibility = View.GONE
+            isClickable = true
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+        }
+        textoTv = TextView(this).apply {
+            setTextColor(Color.WHITE)
+            textSize = 20f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+        }
+        capaTv.addView(textoTv)
+        capaTv.addView(TextView(this).apply {
+            text = "Puedes apagar la pantalla del celular. Mantén el celular en el mismo WiFi."
+            setTextColor(0xFFB8C0E0.toInt())
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, dp(18))
+        })
+        val filaTv = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        filaTv.addView(Transmitir.boton(this, "⏯ Pausa") { Transmitir.pausarOSeguir(this) },
+            LinearLayout.LayoutParams(-2, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })
+        filaTv.addView(Transmitir.boton(this, "📱 Ver en el celular") { salirDeTv(volverAlCelular = true, cerrarSesion = true) },
+            LinearLayout.LayoutParams(-2, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })
+        capaTv.addView(filaTv)
+        raiz.addView(capaTv, FrameLayout.LayoutParams(-1, -1))
 
         setContentView(raiz)
         pantallaCompleta()
@@ -136,7 +191,58 @@ class PeliculaPlayerActivity : Activity() {
         manejador.postDelayed(guardarCada, 5000)
     }
 
+    // ------------------------------------------------------------ ver en la TV
+    private fun pasarATv() {
+        val p = player ?: return
+        val peli = actual() ?: return
+        guardar(true)
+        val desde = if (p.currentPosition > 0) p.currentPosition else Peliculas.posicion(this, peli)
+        val url = ServidorPeliculas.direccion(this, peli.uri)
+        if (url == null) {
+            Toast.makeText(this, "Conecta el celular al WiFi de la casa para enviar la película a la TV.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val tipo = contentResolver.getType(peli.uri) ?: "video/mp4"
+        enTv = true
+        p.pause()
+        vista.keepScreenOn = false
+        vista.useController = false
+        btnTamano.visibility = View.GONE; titulo.visibility = View.GONE; btnTv.visibility = View.GONE
+        textoTv.text = "📡 En ${Transmitir.nombreTv(this)}:\n${peli.titulo}"
+        capaTv.visibility = View.VISIBLE
+        Transmitir.escuchar(this, oyenteTv)
+        val ok = Transmitir.enviar(this, url, peli.titulo, peli.carpeta, "", tipo, false, desde) { msg ->
+            runOnUiThread {
+                if (enTv) textoTv.text = "😕 $msg\nLa TV no acepta este formato de video (mejor si es .mp4)."
+            }
+        }
+        if (!ok) salirDeTv(volverAlCelular = false, cerrarSesion = false)
+    }
+
+    private fun salirDeTv(volverAlCelular: Boolean, cerrarSesion: Boolean) {
+        val posTv = Transmitir.posicionTv(this)
+        if (posTv > 10_000) {
+            actual()?.let { Peliculas.guardarPosicion(this, it, posTv, if (it.duracionMs > 0) it.duracionMs else posTv, true) }
+            player?.seekTo(posTv)
+        }
+        enTv = false
+        Transmitir.dejarDeEscuchar(this, oyenteTv)
+        if (cerrarSesion) Transmitir.detener(this) else ServidorPeliculas.detener(this)
+        capaTv.visibility = View.GONE
+        vista.useController = true
+        vista.keepScreenOn = true
+        if (volverAlCelular) player?.play()
+        vista.showController()
+    }
+
     private fun guardar(forzar: Boolean = false) {
+        if (enTv) {
+            // la película avanza en la TV: se guarda por dónde va allá
+            val peli = actual() ?: return
+            val pos = Transmitir.posicionTv(this)
+            if (pos > 10_000) Peliculas.guardarPosicion(this, peli, pos, if (peli.duracionMs > 0) peli.duracionMs else pos, forzar)
+            return
+        }
         val p = player ?: return
         val peli = actual() ?: return
         if (p.playbackState == Player.STATE_IDLE) return
@@ -178,7 +284,7 @@ class PeliculaPlayerActivity : Activity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (player?.isPlaying == true) {
+        if (player?.isPlaying == true && !enTv) {
             try {
                 enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build())
             } catch (e: Exception) { }
@@ -198,12 +304,24 @@ class PeliculaPlayerActivity : Activity() {
 
     override fun onStop() {
         super.onStop()
-        player?.pause()
+        if (!enTv) player?.pause()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (!enTv) { super.onBackPressed(); return }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("¿Dejar de ver en la TV?")
+            .setPositiveButton("Sí, apagar en la TV") { _, _ -> guardar(true); Transmitir.detener(this); enTv = false; finish() }
+            .setNegativeButton("Salir y que siga en la TV") { _, _ -> guardar(true); finish() }
+            .setNeutralButton("Cancelar", null)
+            .show()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         manejador.removeCallbacksAndMessages(null)
+        Transmitir.dejarDeEscuchar(this, oyenteTv)
         player?.release()
         player = null
     }

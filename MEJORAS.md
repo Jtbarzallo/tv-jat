@@ -20,8 +20,15 @@
       se escuchan como radio (sin imagen, ahorra datos). Menú: ★ Favoritos, 📺 Todos los canales y
       un menú por grupo; logos de los canales; búsqueda y "Ok Google, pon … en TV JAT"; si un canal
       no responde pasa solo al siguiente; al dar play sigue en el último canal visto.
+- [x] v1.6 (2026-11-22): 📡 "Ver en TV" (Google Cast) en canales y en Mis Películas: el celular solo le
+      pasa la dirección del canal a la Android TV y la TV lo descarga sola (el celular deja de descargar
+      y puede apagar la pantalla). Capa de control: anterior/siguiente, lista de canales, pausa, volver
+      al celular. Películas: el celular las presta por el WiFi y siguen desde donde iban (se guarda el
+      avance que lleva en la TV). TV JAT también se puede instalar directo en la Android TV.
 
 ## Pendiente / ideas
+- [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
+      permite); para esos, instalar TV JAT directo en la Android TV.
 - [ ] Android Auto: Mis Películas en el carro (solo sonido) si Jorge lo pide.
 - [ ] Mis Películas: subtítulos .srt con el mismo nombre del video.
 - [ ] Mis Películas: carátulas y sinopsis desde internet.
@@ -45,3 +52,6 @@
   en la pantalla del carro (solo apps de audio), así que los canales se escuchan. Usa la misma lista,
   favoritos y canales ocultos de la app; el último canal escuchado se guarda como "ultimo" (ya va en
   respaldo_tv_jat.json). Sin datos nuevos que respaldar.
+- 2026-11-22: Jorge pide que TV JAT se transmita a la Android TV sin que el celular sufra con la
+  batería → v1.6 con Google Cast (la TV descarga el canal; el celular no). Respaldo: el avance de las
+  películas vistas en la TV se guarda en "progresoPeliculas" de respaldo_tv_jat.json; nada nuevo más.

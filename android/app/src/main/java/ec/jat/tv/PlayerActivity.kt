@@ -1,6 +1,7 @@
 package ec.jat.tv
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.PictureInPictureParams
 import android.content.res.Configuration
 import android.graphics.Color
@@ -42,6 +43,16 @@ class PlayerActivity : Activity() {
     private lateinit var error: TextView
     private lateinit var btnTamano: TextView
     private lateinit var btnCanales: TextView
+    private lateinit var btnTv: TextView
+    private lateinit var capaTv: LinearLayout
+    private lateinit var textoTv: TextView
+    /** true mientras el canal se ve en la TV (el celular no descarga nada). */
+    private var enTv = false
+    private val oyenteTv = object : OyenteTv() {
+        override fun onSessionEnded(s: com.google.android.gms.cast.framework.CastSession, error: Int) {
+            if (enTv) salirDeTv(volverAlCelular = false, cerrarSesion = false)
+        }
+    }
     private lateinit var panel: LinearLayout
     private lateinit var listaPanel: ListView
     private val adaptadorPanel = AdaptadorPanel()
@@ -72,6 +83,7 @@ class PlayerActivity : Activity() {
             setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { v ->
                 btnTamano.visibility = v
                 btnCanales.visibility = if (panelAbierto()) View.GONE else v
+                if (::btnTv.isInitialized && !Transmitir.esTv(this@PlayerActivity)) btnTv.visibility = v
                 if (v == View.VISIBLE) mostrarEtiqueta()
             })
         }
@@ -111,6 +123,56 @@ class PlayerActivity : Activity() {
         raiz.addView(btnCanales, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
             setMargins(dp(16), dp(64), dp(16), 0)
         })
+
+        btnTv = TextView(this).apply {
+            text = "📡 Ver en TV"
+            setTextColor(Color.WHITE)
+            textSize = 15f
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            background = GradientDrawable().apply { setColor(0xAA000000.toInt()); cornerRadius = dp(10).toFloat() }
+            visibility = if (Transmitir.esTv(this@PlayerActivity)) View.GONE else View.VISIBLE
+            setOnClickListener { Transmitir.elegirTv(this@PlayerActivity) { pasarATv() } }
+        }
+        raiz.addView(btnTv, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
+            setMargins(dp(16), dp(112), dp(16), 0)
+        })
+
+        // Capa "Viendo en la TV": controles del canal mientras el celular descansa
+        capaTv = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setBackgroundColor(0xF20B0E1A.toInt())
+            visibility = View.GONE
+            isClickable = true
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+        }
+        textoTv = TextView(this).apply {
+            setTextColor(Color.WHITE)
+            textSize = 20f
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        }
+        capaTv.addView(textoTv)
+        capaTv.addView(TextView(this).apply {
+            text = "Puedes apagar la pantalla del celular: la TV descarga el canal sola."
+            setTextColor(0xFFB8C0E0.toInt())
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, dp(18))
+        })
+        val filaTv = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        fun separado(v: View) = filaTv.addView(v, LinearLayout.LayoutParams(-2, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })
+        separado(Transmitir.boton(this, "◀ Anterior") { player?.let { if (it.hasPreviousMediaItem()) it.seekToPreviousMediaItem() } })
+        separado(Transmitir.boton(this, "☰ Canales") { abrirPanel() })
+        separado(Transmitir.boton(this, "Siguiente ▶") { player?.let { if (it.hasNextMediaItem()) it.seekToNextMediaItem() } })
+        capaTv.addView(filaTv)
+        val filaTv2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        filaTv2.addView(Transmitir.boton(this, "⏯ Pausa") { Transmitir.pausarOSeguir(this) },
+            LinearLayout.LayoutParams(-2, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })
+        filaTv2.addView(Transmitir.boton(this, "📱 Ver en el celular") { salirDeTv(volverAlCelular = true, cerrarSesion = true) },
+            LinearLayout.LayoutParams(-2, -2).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })
+        capaTv.addView(filaTv2)
+        raiz.addView(capaTv, FrameLayout.LayoutParams(-1, -1))
 
         // Panel lateral con la lista de canales (se desplaza mientras sigue el video)
         panel = LinearLayout(this).apply {
@@ -189,6 +251,13 @@ class PlayerActivity : Activity() {
         p.addListener(object : Player.Listener {
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
                 error.visibility = View.GONE
+                if (enTv) {
+                    canalActual = canales.getOrNull(p.currentMediaItemIndex)
+                    canalActual?.let { Datos.guardarUltimo(this@PlayerActivity, it.url) }
+                    adaptadorPanel.notifyDataSetChanged()
+                    enviarCanalTv()
+                    return
+                }
                 if (p.playbackState == Player.STATE_IDLE) p.prepare()
                 canalActual = canales.getOrNull(p.currentMediaItemIndex)
                 canalActual?.let { Datos.guardarUltimo(this@PlayerActivity, it.url) }
@@ -252,6 +321,46 @@ class PlayerActivity : Activity() {
 
     private fun panelAbierto() = panel.visibility == View.VISIBLE
 
+    // ------------------------------------------------------------ ver en la TV
+    private fun pasarATv() {
+        val p = player ?: return
+        enTv = true
+        p.stop()   // el celular deja de descargar el video: ahorra batería y datos
+        vista.keepScreenOn = false
+        vista.useController = false
+        error.visibility = View.GONE
+        etiqueta.visibility = View.GONE; btnTamano.visibility = View.GONE
+        btnCanales.visibility = View.GONE; btnTv.visibility = View.GONE
+        capaTv.visibility = View.VISIBLE
+        Transmitir.escuchar(this, oyenteTv)
+        enviarCanalTv()
+    }
+
+    private fun enviarCanalTv() {
+        val p = player ?: return
+        val c = canales.getOrNull(p.currentMediaItemIndex) ?: return
+        textoTv.text = "📡 En ${Transmitir.nombreTv(this)}:\n${c.nombre}   ${p.currentMediaItemIndex + 1}/${canales.size}"
+        val ok = Transmitir.enviar(this, c.url, c.nombre, c.grupo, c.logo, Transmitir.tipoDe(c.url), true) { msg ->
+            runOnUiThread {
+                if (enTv && canalActual?.url == c.url)
+                    textoTv.text = "😕 $msg\nEste canal no deja verse en la TV. Prueba con Siguiente ▶"
+            }
+        }
+        if (!ok) salirDeTv(volverAlCelular = false, cerrarSesion = false)
+    }
+
+    private fun salirDeTv(volverAlCelular: Boolean, cerrarSesion: Boolean) {
+        enTv = false
+        Transmitir.dejarDeEscuchar(this, oyenteTv)
+        if (cerrarSesion) Transmitir.detener(this)
+        capaTv.visibility = View.GONE
+        vista.useController = true
+        vista.keepScreenOn = true
+        val p = player ?: return
+        if (volverAlCelular) { p.prepare(); p.play() }
+        vista.showController()
+    }
+
     private fun abrirPanel() {
         panel.visibility = View.VISIBLE
         btnCanales.visibility = View.GONE
@@ -267,6 +376,12 @@ class PlayerActivity : Activity() {
 
     private fun cambiarCanal(pos: Int) {
         val p = player ?: return
+        if (enTv) {
+            if (pos == p.currentMediaItemIndex) enviarCanalTv() else p.seekToDefaultPosition(pos)
+            adaptadorPanel.notifyDataSetChanged()
+            cerrarPanel()
+            return
+        }
         if (pos == p.currentMediaItemIndex && p.playbackState != Player.STATE_IDLE) return
         p.seekToDefaultPosition(pos)
         p.prepare()
@@ -276,7 +391,15 @@ class PlayerActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (panelAbierto()) cerrarPanel() else super.onBackPressed()
+        if (panelAbierto()) cerrarPanel()
+        else if (enTv) {
+            AlertDialog.Builder(this)
+                .setTitle("¿Dejar de ver en la TV?")
+                .setPositiveButton("Sí, apagar en la TV") { _, _ -> Transmitir.detener(this); enTv = false; finish() }
+                .setNegativeButton("Salir y que siga en la TV") { _, _ -> finish() }
+                .setNeutralButton("Cancelar", null)
+                .show()
+        } else super.onBackPressed()
     }
 
     private inner class AdaptadorPanel : BaseAdapter() {
@@ -366,7 +489,7 @@ class PlayerActivity : Activity() {
     // Al salir con el botón de inicio, sigue viéndose en una ventanita
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (player?.isPlaying == true) {
+        if (player?.isPlaying == true && !enTv) {
             try {
                 enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build())
             } catch (e: Exception) { }
@@ -378,13 +501,13 @@ class PlayerActivity : Activity() {
         vista.useController = !enPip
         if (enPip) {
             etiqueta.visibility = View.GONE; btnTamano.visibility = View.GONE
-            btnCanales.visibility = View.GONE; cerrarPanel()
+            btnCanales.visibility = View.GONE; btnTv.visibility = View.GONE; cerrarPanel()
         }
     }
 
     override fun onStart() {
         super.onStart()
-        player?.play()
+        if (!enTv) player?.play()
     }
 
     override fun onStop() {
@@ -395,6 +518,7 @@ class PlayerActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         manejador.removeCallbacksAndMessages(null)
+        Transmitir.dejarDeEscuchar(this, oyenteTv)
         player?.release()
         player = null
     }
