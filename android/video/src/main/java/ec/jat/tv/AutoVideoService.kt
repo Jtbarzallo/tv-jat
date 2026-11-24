@@ -62,7 +62,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.common.VideoSize
 import android.view.TextureView
 import android.view.WindowManager
-import java.io.File
+import ec.jat.tv.video.R
 
 /**
  * TV JAT Video: canales y Mis Películas CON IMAGEN en la pantalla del carro (Android Auto).
@@ -84,6 +84,10 @@ class AutoVideoService : CarAppService() {
 class SesionVideo : Session() {
     override fun onCreateScreen(intent: Intent): Screen {
         Registro.instalar(carContext)
+        AutoService.ctx = carContext.applicationContext
+        if (!Puente.hayTvJat(carContext)) {
+            return SinTvJat(carContext)
+        }
         Registro.anotar(carContext, "🖼️ TV JAT Video abierto en el carro (nivel ${carContext.carAppApiLevel})")
         val tv = VideoCarro(carContext)
         tv.arrancar()
@@ -266,8 +270,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     /** Canales de la lista actual, sin los caídos (si están ocultos en la app). */
     fun canales(): List<Canal> {
-        val f = File(ctx.filesDir, "lista.m3u")
-        val marca = if (f.exists()) f.lastModified() xor f.length() else 0L
+        val marca = Datos.marcaLista(ctx)
         if (marca != cacheMarca) {
             cache = Datos.textoLista(ctx)?.let { M3u.leer(it) } ?: emptyList()
             cacheMarca = marca
@@ -775,4 +778,12 @@ class PantallaBuscar(ctx: CarContext, private val tv: VideoCarro) : Screen(ctx) 
         }).setHeaderAction(Action.BACK).setShowKeyboardByDefault(true)
             .setSearchHint("Nombre del canal").setItemList(il.build()).build()
     }
+}
+
+/** Si falta la app TV JAT (de ahí salen la lista y los favoritos). */
+class SinTvJat(ctx: CarContext) : Screen(ctx) {
+    override fun onGetTemplate(): Template =
+        androidx.car.app.model.MessageTemplate.Builder(
+            "Falta la app TV JAT en el celular (o hay que actualizarla).\nInstala TV JAT, ábrela una vez y carga una lista de canales."
+        ).setTitle("TV JAT Video").build()
 }

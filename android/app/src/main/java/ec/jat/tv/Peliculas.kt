@@ -168,6 +168,18 @@ object Peliculas {
         Datos.guardarRespaldo(ctx)
     }
 
+    /** Lo guarda TV JAT Video (desde el carro). */
+    fun guardarClave(ctx: Context, clave: String, o: JSONObject, forzarRespaldo: Boolean) {
+        val todo = progresoJson(ctx)
+        todo.put(clave, o)
+        prefs(ctx).edit().putString("progresoPeliculas", todo.toString()).apply()
+        val ahora = System.currentTimeMillis()
+        if (forzarRespaldo || ahora - ultimoRespaldo > 60_000) {
+            ultimoRespaldo = ahora
+            Datos.guardarRespaldo(ctx)
+        }
+    }
+
     /** Al recuperar un respaldo: se juntan los avances (lo más reciente manda). */
     fun importar(ctx: Context, otro: JSONObject?) {
         if (otro == null) return

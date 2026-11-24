@@ -50,6 +50,11 @@
       las iniciales del canal). Canales en lista (nombres completos) en vez de cuadritos.
       🔧 Diagnóstico Android Auto en el celular (⋮): anota qué pide el carro, qué canal, estado, errores y
       cierres inesperados de la app; se puede compartir.
+- [x] v1.12 (2026-11-23): TV JAT Video pasa a ser una APP APARTE (TVJAT-Video.apk, paquete ec.jat.tv.video):
+      Android Auto no mostraba el ícono de video porque en un mismo programa solo muestra la app de audio.
+      TV JAT Video no guarda nada propio: pide la lista, favoritos, último canal y avance de películas a TV JAT
+      por un puente seguro (DatosProvider, solo apps firmadas con la llave JAT) y guarda allá → mismo respaldo.
+      Su diagnóstico también se anota en TV JAT (⋮ → 🔧 Diagnóstico Android Auto).
 
 ## Pendiente / ideas
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
@@ -100,3 +105,6 @@
 - 2026-11-23: Jorge manda foto: en el carro (TV JAT radio) los logos salen ⚠ y al tocar no suena nada. Arreglo de
   logos + diagnóstico para ver la causa exacta del silencio. Respaldo: sin datos nuevos (el diagnóstico es
   solo un registro temporal).
+- 2026-11-23: Jorge: en el carro solo aparece TV JAT (radio), no TV JAT Video. Causa: Android Auto muestra una sola
+  app del carro por programa → se separó TV JAT Video en su propia APK. Respaldo: sin datos nuevos; todo sigue
+  en respaldo_tv_jat.json de TV JAT.

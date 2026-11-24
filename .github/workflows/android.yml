@@ -31,13 +31,20 @@ jobs:
           set -o pipefail
           gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee ../build.log
       - name: Renombrar APK
-        run: cp app/build/outputs/apk/release/app-release.apk ../TVJAT.apk
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk ../TVJAT.apk
+          cp video/build/outputs/apk/release/video-release.apk ../TVJAT-Video.apk
       - name: Publicar descarga
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: TV JAT v1.0.${{ github.run_number }}
-          files: TVJAT.apk
+          body: |
+            - **TVJAT.apk**: la app TV JAT (celular, TV y Android Auto con sonido).
+            - **TVJAT-Video.apk**: TV JAT Video, para ver canales y películas CON IMAGEN en Android Auto. Instala primero TV JAT.
+          files: |
+            TVJAT.apk
+            TVJAT-Video.apk
           make_latest: true
       - name: Guardar registro si falla
         if: failure()
