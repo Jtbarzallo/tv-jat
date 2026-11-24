@@ -123,6 +123,13 @@ object Datos {
         guardarRespaldo(ctx)
     }
 
+    /** Cómo llena la imagen la pantalla del carro: "completa" (sin franjas, recorta bordes) o "entera". */
+    fun ajusteImagen(ctx: Context) = prefs(ctx).getString("ajusteImagen", "completa") ?: "completa"
+    fun setAjusteImagen(ctx: Context, v: String) {
+        prefs(ctx).edit().putString("ajusteImagen", v).apply()
+        guardarRespaldo(ctx)
+    }
+
     // ---------- último canal ----------
     fun ultimo(ctx: Context): String = prefs(ctx).getString("ultimo", "") ?: ""
     fun guardarUltimo(ctx: Context, url: String) {
@@ -144,6 +151,7 @@ object Datos {
         .put("ocultarCaidos", ocultarCaidos(ctx))
         .put("modoPasajero", modoPasajero(ctx))
         .put("formaImagen", formaImagen(ctx))
+        .put("ajusteImagen", ajusteImagen(ctx))
         .put("progresoPeliculas", Peliculas.progresoJson(ctx))
         .put("listaM3u", textoLista(ctx) ?: "")
         .toString(2)
@@ -174,6 +182,7 @@ object Datos {
             .putBoolean("ocultarCaidos", json.optBoolean("ocultarCaidos", true))
             .putBoolean("modoPasajero", json.optBoolean("modoPasajero", true))
             .putString("formaImagen", json.optString("formaImagen", "A"))
+            .putString("ajusteImagen", json.optString("ajusteImagen", "completa"))
             .apply()
         Peliculas.importar(ctx, json.optJSONObject("progresoPeliculas"))
         guardarRespaldo(ctx)

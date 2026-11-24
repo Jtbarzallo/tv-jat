@@ -61,6 +61,11 @@
       aunque "Fuentes desconocidas" esté activo). Si ya estaba instalada desde Chrome, avisa al abrir TV JAT
       y la reinstala paso a paso. El diagnóstico muestra quién la instaló.
 ## Pendiente / ideas
+- [x] v1.14 (2026-11-24): 🚗 TV JAT Video: video más fluido (colchón de 6 s antes de seguir, en vivo 15 s
+      atrás del directo y siempre a velocidad normal, calidad máxima 720p como la pantalla del carro); imagen en
+      TODA la pantalla (Completa/Entera en ⚙); panel al costado con canales, grupos, Mis Películas y opciones
+      que se toca y se desliza con el dedo mientras sigue el video (botón ☰ Canales o tocar la imagen).
+      Diagnóstico: cuadros perdidos y pausas por carga.
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
       permite); para esos, instalar TV JAT directo en la Android TV.
 - [ ] Mis Películas: subtítulos .srt con el mismo nombre del video.
@@ -116,3 +121,6 @@
   reiniciado). Causa real: Android Auto solo muestra apps de la librería del carro si figuran instaladas
   por Google Play; instalada desde Chrome la esconde. → v1.13 instalador interno en TV JAT que la registra
   como de Google Play (método de KingInstaller). Respaldo: sin datos nuevos (el APK descargado es temporal).
+- 2026-11-24: Jorge confirma que TV JAT Video ya sale en el carro y funciona. Pide video fluido "sin detenerse",
+  imagen en toda la pantalla y opciones/canales a un costado → v1.14. Respaldo: nuevo dato "ajusteImagen"
+  (completa/entera) en respaldo_tv_jat.json.

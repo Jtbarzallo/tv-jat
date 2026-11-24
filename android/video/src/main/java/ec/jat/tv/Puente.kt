@@ -53,6 +53,8 @@ object Datos {
     fun guardarUltimo(ctx: Context, url: String) { Puente.llamar(ctx, "guardarUltimo", url); Puente.olvidar() }
     fun setModoPasajero(ctx: Context, v: Boolean) { Puente.llamar(ctx, "modoPasajero", if (v) "1" else "0"); Puente.olvidar() }
     fun setFormaImagen(ctx: Context, v: String) { Puente.llamar(ctx, "formaImagen", v); Puente.olvidar() }
+    fun ajusteImagen(ctx: Context): String = Puente.estado(ctx).getString("ajusteImagen") ?: "completa"
+    fun setAjusteImagen(ctx: Context, v: String) { Puente.llamar(ctx, "ajusteImagen", v); Puente.olvidar() }
     fun progreso(ctx: Context): JSONObject = try { JSONObject(Puente.estado(ctx).getString("progreso") ?: "{}") } catch (e: Exception) { JSONObject() }
 }
 

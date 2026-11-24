@@ -43,11 +43,13 @@ class DatosProvider : ContentProvider() {
                 b.putString("ultimo", Datos.ultimo(ctx))
                 b.putBoolean("modoPasajero", Datos.modoPasajero(ctx))
                 b.putString("formaImagen", Datos.formaImagen(ctx))
+                b.putString("ajusteImagen", Datos.ajusteImagen(ctx))
                 b.putString("progreso", Peliculas.progresoJson(ctx).toString())
             }
             "guardarUltimo" -> Datos.guardarUltimo(ctx, arg.orEmpty())
             "modoPasajero" -> Datos.setModoPasajero(ctx, arg == "1")
             "formaImagen" -> Datos.setFormaImagen(ctx, if (arg == "B") "B" else "A")
+            "ajusteImagen" -> Datos.setAjusteImagen(ctx, if (arg == "entera") "entera" else "completa")
             "guardarProgreso" -> {
                 val json = extras?.getString("json")
                 if (!arg.isNullOrEmpty() && json != null)
