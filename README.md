@@ -23,6 +23,9 @@ https://github.com/Jtbarzallo/tv-jat/releases/latest
     Modo pasajero (activado): la imagen se ve también en marcha. Se puede apagar en Menú → Modo pasajero.
   Como la app no viene de Play Store: en Android Auto → Ajustes → tocar 10 veces "Versión" →
   ⋮ Configuración para desarrolladores → activar **Fuentes desconocidas**.
+  ⚠️ **TV JAT Video NO se instala desde Chrome**: Android Auto la esconde si no figura como instalada
+  por Google Play. Se instala desde TV JAT: ⋮ → **🚗 Poner TV JAT Video en el carro** (la descarga y la
+  instala marcada como de Google Play). Para actualizarla, usar el mismo botón.
 
 ## 💻 TV JAT para PC (Windows)
 Descarga en **Releases** la versión `pc-v1.0.N`:

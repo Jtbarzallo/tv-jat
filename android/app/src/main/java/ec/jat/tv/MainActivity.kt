@@ -35,6 +35,10 @@ class MainActivity : Activity() {
         private const val PEDIR_LISTA = 1
         private const val PEDIR_EXPORTAR = 2
         private const val PEDIR_IMPORTAR = 3
+        private const val PEDIR_PERMISO_INSTALAR = 10
+        private const val PEDIR_DESINSTALAR = 11
+        private const val PEDIR_INSTALAR = 12
+        private var avisoCarroMostrado = false
         private const val TODOS = "Todos los canales"
         private const val FAVORITOS = "★ Favoritos"
         private const val FONDO = 0xFF14182C.toInt()
@@ -75,6 +79,131 @@ class MainActivity : Activity() {
             }
             else descargarLista(Datos.LISTA_ECUADOR, "Canales de Ecuador")
         }
+        revisarVideoCarro()
+    }
+
+    // ---------------- TV JAT Video en el carro ----------------
+    /** Si TV JAT Video está instalada pero Android Auto la esconde, ofrece arreglarlo. */
+    private fun revisarVideoCarro() {
+        if (avisoCarroMostrado) return
+        val e = InstaladorVideo.estado(this)
+        if (!e.instalada || e.lista) return
+        avisoCarroMostrado = true
+        AlertDialog.Builder(this)
+            .setTitle("🚗 TV JAT Video no sale en el carro")
+            .setMessage("Android Auto la esconde porque fue instalada desde Chrome y no desde Google Play.\n\n" +
+                "TV JAT la puede reinstalar de la forma correcta. Solo toca los botones que vayan saliendo.")
+            .setPositiveButton("Arreglar ahora") { _, _ -> instalarVideo() }
+            .setNegativeButton("Después", null)
+            .show()
+    }
+
+    private fun instalarVideo() {
+        if (android.os.Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            AlertDialog.Builder(this)
+                .setTitle("Paso 1: dar permiso")
+                .setMessage("En la pantalla que se abre, activa \"Permitir desde esta fuente\" para TV JAT y luego regresa con la flecha ←.")
+                .setPositiveButton("Abrir") { _, _ ->
+                    startActivityForResult(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:$packageName")), PEDIR_PERMISO_INSTALAR)
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+            return
+        }
+        val e = InstaladorVideo.estado(this)
+        if (e.instalada && !e.lista) {
+            AlertDialog.Builder(this)
+                .setTitle("Paso 2: quitar la versión de Chrome")
+                .setMessage("Primero hay que quitar la TV JAT Video que instalaste desde Chrome. " +
+                    "En la pantalla que se abre toca \"Aceptar\" o \"Desinstalar\".\n\nTus canales, favoritos y películas NO se borran (están en TV JAT).")
+                .setPositiveButton("Continuar") { _, _ ->
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(Intent(Intent.ACTION_UNINSTALL_PACKAGE,
+                        Uri.parse("package:${InstaladorVideo.PAQUETE}")).putExtra(Intent.EXTRA_RETURN_RESULT, true),
+                        PEDIR_DESINSTALAR)
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+            return
+        }
+        descargarEInstalarVideo()
+    }
+
+    private fun descargarEInstalarVideo() {
+        val texto = TextView(this).apply { textSize = 18f; setPadding(50, 40, 50, 40); text = "Descargando TV JAT Video… 0 %" }
+        val dlg = AlertDialog.Builder(this).setTitle("Paso 3: descargar").setView(texto).setCancelable(false).show()
+        thread {
+            try {
+                InstaladorVideo.descargar(this) { p -> runOnUiThread { texto.text = "Descargando TV JAT Video… $p %" } }
+                runOnUiThread { dlg.dismiss(); lanzarInstalador() }
+            } catch (ex: Exception) {
+                runOnUiThread {
+                    dlg.dismiss()
+                    AlertDialog.Builder(this).setTitle("No se pudo descargar")
+                        .setMessage("Revisa que tengas internet y vuelve a intentar.\n\n(${ex.message})")
+                        .setPositiveButton("Reintentar") { _, _ -> descargarEInstalarVideo() }
+                        .setNegativeButton("Cerrar", null).show()
+                }
+            }
+        }
+    }
+
+    private fun lanzarInstalador() {
+        val uri = InstaladorVideo.URI_APK
+        @Suppress("DEPRECATION")
+        val base = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+            putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, InstaladorVideo.PLAY)
+            putExtra("installerPackageName", InstaladorVideo.PLAY)
+            putExtra("android.intent.extra.INSTALL_REASON", 1)
+            putExtra(Intent.EXTRA_RETURN_RESULT, true)
+        }
+        Registro.anotar(this, "Instalar TV JAT Video: lanzando instalador")
+        // Primero el instalador de Google directo (el de Xiaomi a veces no pasa el dato de "Google Play")
+        for (p in listOf("com.google.android.packageinstaller", "com.android.packageinstaller")) {
+            val i = Intent(base).setPackage(p)
+            if (i.resolveActivity(packageManager) != null) {
+                try {
+                    grantUriPermission(p, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    startActivityForResult(i, PEDIR_INSTALAR)
+                    return
+                } catch (ex: Exception) {
+                    Registro.anotar(this, "Instalador $p falló: ${ex.message}")
+                }
+            }
+        }
+        startActivityForResult(base, PEDIR_INSTALAR)
+    }
+
+    private fun resultadoVideo() {
+        val e = InstaladorVideo.estado(this)
+        Registro.anotar(this, InstaladorVideo.resumen(this))
+        val b = AlertDialog.Builder(this)
+        when {
+            e.lista -> b.setTitle("✅ Listo")
+                .setMessage("TV JAT Video quedó instalada como de Google Play. Ahora Android Auto sí la muestra.\n\n" +
+                    "1. Desconecta el celular del carro.\n2. Vuelve a conectarlo.\n3. Toca los cuadritos ▦ y busca la claqueta roja \"TV JAT Video\".")
+                .setPositiveButton("OK", null)
+            !e.instalada -> b.setTitle("No se terminó de instalar")
+                .setMessage("La instalación se canceló. Vuelve a intentar y toca \"Instalar\" cuando lo pida.")
+                .setPositiveButton("Reintentar") { _, _ -> instalarVideo() }
+                .setNegativeButton("Cerrar", null)
+            else -> b.setTitle("⚠️ Se instaló, pero el celular no la marcó como de Google Play")
+                .setMessage(InstaladorVideo.resumen(this) + "\n\nToca \"Compartir\" y mándale este mensaje a Claude.")
+                .setPositiveButton("Compartir") { _, _ ->
+                    startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "TV JAT " +
+                            packageManager.getPackageInfo(packageName, 0).versionName + " / Android " +
+                            android.os.Build.VERSION.RELEASE + " / " + android.os.Build.MANUFACTURER + " " +
+                            android.os.Build.MODEL + "\n" + InstaladorVideo.resumen(this@MainActivity) + "\n\n" + Registro.leer(this@MainActivity))
+                    }, "Compartir"))
+                }
+                .setNegativeButton("Cerrar", null)
+        }
+        b.show()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -221,6 +350,7 @@ class MainActivity : Activity() {
 
     private fun menuMas(ancla: View) {
         val menu = PopupMenu(this, ancla)
+        menu.menu.add(0, 8, 0, "🚗 Poner TV JAT Video en el carro")
         menu.menu.add(0, 5, 0, "🩺 Revisar qué canales funcionan")
         menu.menu.add(0, 6, 0, if (Datos.ocultarCaidos(this)) "👁 Mostrar también los que no funcionan"
                                else "🙈 Ocultar los que no funcionan")
@@ -247,6 +377,15 @@ class MainActivity : Activity() {
                 }, PEDIR_IMPORTAR)
                 5 -> revisarCanales()
                 7 -> verDiagnostico()
+                8 -> {
+                    val e = InstaladorVideo.estado(this)
+                    if (e.lista) AlertDialog.Builder(this).setTitle("🚗 TV JAT Video")
+                        .setMessage("Ya está bien instalada (como de Google Play). Debe salir en el carro como la claqueta roja.\n\n" +
+                            "¿Quieres reinstalarla igual (por ejemplo, para actualizarla)?")
+                        .setPositiveButton("Reinstalar") { _, _ -> descargarEInstalarVideo() }
+                        .setNegativeButton("No", null).show()
+                    else instalarVideo()
+                }
                 6 -> {
                     Datos.setOcultarCaidos(this, !Datos.ocultarCaidos(this))
                     filtrar()
@@ -267,7 +406,8 @@ class MainActivity : Activity() {
 
     /** Muestra lo que pasó en Android Auto (para saber qué falla) y deja compartirlo. */
     private fun verDiagnostico() {
-        val texto = "TV JAT " + packageManager.getPackageInfo(packageName, 0).versionName + "\n\n" + Registro.leer(this)
+        val texto = "TV JAT " + packageManager.getPackageInfo(packageName, 0).versionName + "\n" +
+            InstaladorVideo.resumen(this) + "\n\n" + Registro.leer(this)
         val vista = TextView(this).apply {
             text = texto
             setTextIsSelectable(true)
@@ -318,6 +458,19 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            PEDIR_PERMISO_INSTALAR -> {
+                if (android.os.Build.VERSION.SDK_INT >= 26 && packageManager.canRequestPackageInstalls()) instalarVideo()
+                else aviso("Falta activar el permiso para que TV JAT pueda instalar")
+                return
+            }
+            PEDIR_DESINSTALAR -> {
+                if (!InstaladorVideo.estado(this).instalada) descargarEInstalarVideo()
+                else aviso("No se quitó la versión anterior. Vuelve a intentar.")
+                return
+            }
+            PEDIR_INSTALAR -> { resultadoVideo(); return }
+        }
         val uri = data?.data ?: return
         if (resultCode != RESULT_OK) return
         when (requestCode) {

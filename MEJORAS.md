@@ -56,6 +56,10 @@
       por un puente seguro (DatosProvider, solo apps firmadas con la llave JAT) y guarda allá → mismo respaldo.
       Su diagnóstico también se anota en TV JAT (⋮ → 🔧 Diagnóstico Android Auto).
 
+- [x] v1.13 (2026-11-24): 🚗 ⋮ → "Poner TV JAT Video en el carro": TV JAT descarga TVJAT-Video.apk y la
+      instala marcada como de Google Play (sin eso Android Auto esconde las apps del carro con imagen,
+      aunque "Fuentes desconocidas" esté activo). Si ya estaba instalada desde Chrome, avisa al abrir TV JAT
+      y la reinstala paso a paso. El diagnóstico muestra quién la instaló.
 ## Pendiente / ideas
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
       permite); para esos, instalar TV JAT directo en la Android TV.
@@ -108,3 +112,7 @@
 - 2026-11-23: Jorge: en el carro solo aparece TV JAT (radio), no TV JAT Video. Causa: Android Auto muestra una sola
   app del carro por programa → se separó TV JAT Video en su propia APK. Respaldo: sin datos nuevos; todo sigue
   en respaldo_tv_jat.json de TV JAT.
+- 2026-11-24: Jorge: TV JAT Video sigue sin salir en el carro (Fuentes desconocidas activo, Android Auto
+  reiniciado). Causa real: Android Auto solo muestra apps de la librería del carro si figuran instaladas
+  por Google Play; instalada desde Chrome la esconde. → v1.13 instalador interno en TV JAT que la registra
+  como de Google Play (método de KingInstaller). Respaldo: sin datos nuevos (el APK descargado es temporal).

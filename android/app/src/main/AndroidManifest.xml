@@ -12,6 +12,19 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- Para instalar TV JAT Video como "de Google Play" (si no, Android Auto la esconde) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
+    <queries>
+        <package android:name="ec.jat.tv.video" />
+        <package android:name="com.google.android.packageinstaller" />
+        <package android:name="com.android.packageinstaller" />
+        <intent>
+            <action android:name="android.intent.action.INSTALL_PACKAGE" />
+            <data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+    </queries>
 
     <!-- También se puede instalar directo en la Android TV (control remoto, sin pantalla táctil) -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -34,6 +47,13 @@
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
             android:value="ec.jat.tv.CastOpciones" />
+
+        <!-- Entrega el APK de TV JAT Video al instalador del sistema -->
+        <provider
+            android:name=".ApkProvider"
+            android:authorities="ec.jat.tv.apk"
+            android:exported="false"
+            android:grantUriPermissions="true" />
 
         <activity
             android:name=".MainActivity"
