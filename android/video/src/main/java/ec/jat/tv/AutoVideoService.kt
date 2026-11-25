@@ -1259,8 +1259,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         vozTexto = ""
         volumenAntes = player.volume
         player.volume = 0.1f                    // que el micrófono no oiga la TV
-        ponerAviso("🎤 Escuchando…
-di el nombre del canal")
+        ponerAviso("🎤 Escuchando…\ndi el nombre del canal")
         val sr = try { SpeechRecognizer.createSpeechRecognizer(ctx) } catch (e: Exception) { null }
         if (sr == null) { detenerVoz(); avisoBreve("No se pudo usar el micrófono"); return }
         reconocedor = sr
