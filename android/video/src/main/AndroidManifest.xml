@@ -10,12 +10,17 @@
     <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Búsqueda de canales por voz (micrófono del carro o del celular) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Lee la lista, favoritos y avance de películas de la app TV JAT -->
     <queries>
         <package android:name="ec.jat.tv" />
         <provider android:authorities="ec.jat.tv.datos" />
         <provider android:authorities="ec.jat.tv.logos" />
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
     </queries>
 
     <application

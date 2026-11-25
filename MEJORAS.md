@@ -73,6 +73,18 @@
       películas —se toca para saltar—, ● EN VIVO, ⚙ Ajustes, 📶 Calidad 720p/1080p/480p). Aparece al abrir y al
       tocar la imagen; se esconde sola a los 12 s si está reproduciendo. Se acomoda a la parte que Android Auto
       no tapa.
+- [x] v1.16 (2026-11-25): 🚗 TV JAT Video:
+      · ☰ Lista: la lista de canales sale ENCIMA del video (antes, en carros que no pasan los toques, se iba a
+        otra pantalla); ✕ o tocar la imagen la quita. Botones ▲ ▼ ✓ al costado para moverse por la lista con un
+        cuadro blanco sin tocar la pantalla.
+      · 🎤 Voz en vez del teclado: dices el nombre del canal (micrófono del carro; si no se puede, el del celular),
+        busca parecidos aunque no sea exacto (sin tildes, "pon Ecuavisa", "tele amazonas") y lo pone solo; si hay
+        varios, los muestra para elegir. El teclado sigue en "⌨ Escribir con teclado". Mientras escucha, baja el
+        volumen de la TV.
+      · Línea de tiempo: guarda hasta 2 min adelante y 90 s ya vistos atrás; el en vivo va 30 s detrás del directo
+        (colchón); espera 8 s guardados antes de seguir si se corta. Barra: azul = guardado, punto blanco = lo que
+        ves, hora que estás viendo; se toca para regresar y "● Ir a EN VIVO" vuelve al directo.
+      · ⭐ Estrella junto al nombre del canal (y en los botones del carro): agrega/quita de Favoritos sin salir.
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
       permite); para esos, instalar TV JAT directo en la Android TV.
 - [ ] Mis Películas: subtítulos .srt con el mismo nombre del video.
@@ -134,3 +146,11 @@
 - 2026-11-24: Jorge manda una foto de una app de TV para carro ("DriveTV") y pide "arregla jat tv, haz una interfaz
   similar" → v1.15 interfaz nueva en TV JAT Video. Respaldo: nuevo dato "calidad" (auto/alta/ahorro) en
   respaldo_tv_jat.json (se guarda en TV JAT por el puente, igual que los demás ajustes).
+
+- 2026-11-25: Jorge confirma que v1.15 funciona. Reporta: 1) buscar abre teclado, incómodo en el carro → pide botón de
+  voz; 2) para ver los canales tiene que salir de la pantalla del video (causa: el botón ☰ abría el menú de Android
+  Auto cuando el carro no pasa los toques) → pide que la lista salga al tocar el video y se quite al tocar otra vez;
+  3) video de corrido, sin pausas ni congelamientos, guardando en una línea de tiempo; 4) estrella para marcar
+  favorito desde el video. Aprobó las imágenes de cómo quedaría → v1.16. Respaldo: los favoritos marcados con la
+  estrella se guardan en TV JAT (misma lista "favoritos" de respaldo_tv_jat.json); el colchón/línea de tiempo y la
+  voz no guardan datos (son temporales). Permiso nuevo en TV JAT Video: micrófono.

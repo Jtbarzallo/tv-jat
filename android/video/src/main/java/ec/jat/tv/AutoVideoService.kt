@@ -30,6 +30,16 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.ImageView
+import android.os.ParcelFileDescriptor
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.media.AudioFormat
+import androidx.car.app.media.CarAudioRecord
+import androidx.media3.common.Timeline
+import java.text.Normalizer
+import java.text.SimpleDateFormat
+import java.util.Date
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Typeface
@@ -197,10 +207,13 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 true
             )
             .setWakeMode(C.WAKE_MODE_NETWORK)
-            // Colchón grande: junta varios segundos antes de empezar y no arranca otra vez
-            // hasta tener 6 s guardados (evita el "avanza-se detiene-avanza")
+            // Línea de tiempo: guarda hasta 2 min hacia adelante (si el internet baja, se gasta lo guardado)
+            // y 90 s ya vistos hacia atrás (para regresar sin volver a descargar). Si se queda sin colchón,
+            // espera a tener 8 s guardados antes de seguir (evita el "avanza-se detiene-avanza").
             .setLoadControl(DefaultLoadControl.Builder()
-                .setBufferDurationsMs(30_000, 90_000, 3_000, 6_000)
+                .setBufferDurationsMs(40_000, 120_000, 3_000, 8_000)
+                .setBackBuffer(90_000, true)
+                .setTargetBufferBytes(64 * 1024 * 1024)
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build())
             .build()
@@ -320,10 +333,10 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     private fun itemCanal(c: Canal): MediaItem {
         val b = MediaItem.Builder().setMediaId(c.url).setUri(Uri.parse(c.url))
             .setMediaMetadata(MediaMetadata.Builder().setTitle(c.nombre).build())
-            // En vivo: ir unos segundos atrás del "en directo" para tener colchón, y a velocidad
+            // En vivo: ir 30 s atrás del "en directo" (esos 30 s ya existen y se bajan rápido = colchón), y a velocidad
             // normal siempre (acelerar/frenar para alcanzar el directo hace que la imagen dé saltitos)
             .setLiveConfiguration(MediaItem.LiveConfiguration.Builder()
-                .setTargetOffsetMs(15_000).setMinPlaybackSpeed(1f).setMaxPlaybackSpeed(1f).build())
+                .setTargetOffsetMs(30_000).setMinPlaybackSpeed(1f).setMaxPlaybackSpeed(1f).build())
         val u = c.url.lowercase()
         when {
             u.contains("m3u8") -> b.setMimeType(MimeTypes.APPLICATION_M3U8)
@@ -548,8 +561,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         pres = null; vd = null; vista = null; titulo = null; aviso = null
         capa = null; panel = null; panelLista = null; panelScroll = null; panelTitulo = null; raizVista = null
         chipCanales = null; chipPelis = null; btnPausa = null; btnAnt = null; btnSig = null; lblAnt = null; lblSig = null
-        infoNombre = null; infoSub = null; infoTiempo = null; infoVivo = null; infoCalidad = null; barra = null
-        filasLogo.clear(); filaMarcada = null
+        infoNombre = null; infoSub = null; infoTiempo = null; infoVivo = null; infoCalidad = null; barra = null; estrella = null
+        filasLogo.clear(); filaMarcada = null; filasAccion.clear(); cursor = -1
         panelVisible = false
         main.removeCallbacks(refresco); main.removeCallbacks(ocultarSolo)
         superficie = null; directa = false
@@ -729,7 +742,10 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             text = "TV JAT"; setTextColor(Color.WHITE); gravity = Gravity.CENTER
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f); setTypeface(typeface, Typeface.BOLD)
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        arriba.addView(chip(c, "🔍") { ocultarPanel(); irA(PantallaBuscar(ctx, this)) }.apply { setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f) })
+        arriba.addView(chip(c, "🎤 Voz") { buscarPorVoz() }.apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f); setTypeface(typeface, Typeface.BOLD)
+            background = redondo(ROJO, 40f)
+        })
         cp.addView(arriba, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, 50), Gravity.TOP))
 
         // ---- lista al costado derecho
@@ -784,6 +800,12 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             setBackgroundColor(0xF0121519.toInt())
             setPadding(dp(c, 16), dp(c, 6), dp(c, 6), dp(c, 6))
         }
+        val est = TextView(c).apply {
+            text = "☆"; gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setOnClickListener { cambiarFavoritoActual(); tocado() }
+        }
+        info.addView(est, LinearLayout.LayoutParams(dp(c, 40), dp(c, 40)).apply { rightMargin = dp(c, 8) })
         val izq = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
         val nom = TextView(c).apply {
             setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 19f); setTypeface(typeface, Typeface.BOLD)
@@ -798,7 +820,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val centro = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(c, 12), 0, dp(c, 8), 0) }
         val br = Barra(c).apply {
             alTocar = { f ->
-                if (modo == Modo.PELICULAS && player.duration > 0) { player.seekTo((player.duration * f).toLong()); actualizarCapa() }
+                // películas: salta a ese minuto · en vivo: regresa en la línea de tiempo
+                if (player.duration > 0 && player.duration != C.TIME_UNSET) { player.seekTo((player.duration * f).toLong()); actualizarCapa() }
                 tocado()
             }
         }
@@ -808,6 +831,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         filaT.addView(tiempo, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         val vivo = TextView(c).apply {
             text = "● EN VIVO"; setTextColor(ROJO); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTypeface(typeface, Typeface.BOLD)
+            setPadding(dp(c, 6), dp(c, 2), dp(c, 2), dp(c, 2))
+            setOnClickListener { irAlDirecto(); tocado() }
         }
         filaT.addView(vivo)
         centro.addView(filaT)
@@ -822,7 +847,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         capa = cp; panel = pn; panelScroll = sv; panelLista = ll; panelTitulo = tt
         chipCanales = cc; chipPelis = cpel
         btnPausa = pau.icono; btnAnt = ant.icono; btnSig = sig.icono; lblAnt = ant.texto; lblSig = sig.texto
-        infoNombre = nom; infoSub = sub; infoTiempo = tiempo; infoVivo = vivo; infoCalidad = caTxt; barra = br
+        infoNombre = nom; infoSub = sub; infoTiempo = tiempo; infoVivo = vivo; infoCalidad = caTxt; barra = br; estrella = est
     }
 
     private fun hms(ms: Long): String {
@@ -858,17 +883,49 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val pos = player.currentPosition
         val enVivo = !pelis && (player.isCurrentMediaItemLive || dur == C.TIME_UNSET || dur <= 0)
         val br = barra
-        if (enVivo) {
-            val colchon = (player.bufferedPosition - pos).coerceAtLeast(0)
-            br?.colorRelleno = ACENTO
-            br?.avance = colchon / 30_000f
-            infoTiempo?.text = "Colchón: ${colchon / 1000} s"
+        val colchon = (player.bufferedPosition - pos).coerceAtLeast(0)
+        if (enVivo && dur > 0 && dur != C.TIME_UNSET) {
+            // línea de tiempo: de lo más viejo que se puede ver hasta el directo
+            br?.colorRelleno = 0x00000000
+            br?.colorGuardado = ACENTO
+            br?.guardado = player.bufferedPosition.toFloat() / dur
+            br?.avance = pos.toFloat() / dur
+            val atras = (dur - pos).coerceAtLeast(0)
+            infoTiempo?.text = "Viendo ${horaReloj(atras)} · guardado ${colchon / 1000} s"
+            val lejos = atras > 50_000
+            infoVivo?.text = if (lejos) "● Ir a EN VIVO" else "● EN VIVO"
+            infoVivo?.visibility = View.VISIBLE
+        } else if (enVivo) {
+            // transmisión sin línea de tiempo (solo se puede guardar hacia adelante)
+            br?.colorRelleno = 0x00000000
+            br?.colorGuardado = ACENTO
+            br?.guardado = colchon / 60_000f
+            br?.avance = 0f
+            infoTiempo?.text = "Guardado: ${colchon / 1000} s"
+            infoVivo?.text = "● EN VIVO"
             infoVivo?.visibility = View.VISIBLE
         } else {
             br?.colorRelleno = ROJO
+            br?.colorGuardado = 0x66FFFFFF
+            br?.guardado = if (dur > 0) player.bufferedPosition.toFloat() / dur else 0f
             br?.avance = if (dur > 0) pos.toFloat() / dur else 0f
             infoTiempo?.text = if (dur > 0) "${hms(pos)} / ${hms(dur)}" else hms(pos)
             infoVivo?.visibility = View.GONE
+        }
+        // estrella de favorito (solo en canales)
+        val est = estrella
+        val cAct = if (!pelis) canalesLista.getOrNull(i) else null
+        if (est != null) {
+            if (cAct == null) est.visibility = View.GONE
+            else {
+                est.visibility = View.VISIBLE
+                val fav = cAct.url in Datos.favoritos(ctx)
+                est.text = if (fav) "★" else "☆"
+                est.setTextColor(if (fav) 0xFF3A2A00.toInt() else GRIS)
+                est.background = if (fav) redondo(0xFFF5B301.toInt()) else GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL; setStroke(dp(est.context, 2), GRIS)
+                }
+            }
         }
         infoCalidad?.text = "Calidad ${calidadTexto()}"
     }
@@ -928,6 +985,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(cx, 3) })
         f.addView(textos, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         ll.addView(f)
+        filasAccion.add(f to accion)
         if (marcada) {
             ll.addView(View(cx).apply { setBackgroundColor(ACENTO) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(cx, 3)))
             filaMarcada = f
@@ -975,6 +1033,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             setOnClickListener { accion(); tocado() }
         }
         ll.addView(v)
+        filasAccion.add(v to accion)
         if (marcada) {
             ll.addView(View(c).apply { setBackgroundColor(ACENTO) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, 3)))
             filaMarcada = v
@@ -985,6 +1044,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val ll = panelLista ?: return
         ll.removeAllViews()
         filasLogo.clear(); filaMarcada = null
+        filasAccion.clear(); cursor = -1
         panelScroll?.scrollTo(0, 0)
         when (panelVista) {
             "grupos" -> {
@@ -1025,6 +1085,22 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                     fila(p.titulo, sub, p.clave == actual) { ponerPeliDe(p, todas) }
                 }
             }
+            "voz" -> {
+                panelTitulo?.text = if (vozTexto.isEmpty()) "🎤 Búsqueda por voz" else "🎤 «$vozTexto»"
+                fila("🎤 Hablar otra vez") { buscarPorVoz() }
+                val todos = canales()
+                val fav = Datos.favoritos(ctx)
+                vozResultados.forEachIndexed { n, c ->
+                    filaCanal(n + 1, c, false, c.url in fav) {
+                        grupoSel = null
+                        val i = todos.indexOfFirst { it.url == c.url }
+                        if (i >= 0) ponerCanales(todos, i) else ponerCanales(vozResultados, n)
+                        panelVista = "canales"; pintarPanel()
+                    }
+                }
+                if (vozResultados.isEmpty() && vozTexto.isNotEmpty()) fila("No encontré ese canal", "Prueba otra vez o usa el teclado") {}
+                fila("⌨ Escribir con teclado", "Solo con el carro detenido") { ocultarPanel(); irA(PantallaBuscar(ctx, this)) }
+            }
             "opciones" -> {
                 panelTitulo?.text = "⚙ Ajustes"
                 val entera = Datos.ajusteImagen(ctx) == "entera"
@@ -1062,6 +1138,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         panelScroll?.post {
             val v = filaMarcada
             if (v != null) panelScroll?.scrollTo(0, maxOf(0, v.top - dp(ll.context, 60)))
+            cursor = filasAccion.indexOfFirst { it.first === v }.coerceAtLeast(0)
+            if (usaCursor) pintarCursor()
             cargarLogosVisibles()
         }
     }
@@ -1072,8 +1150,266 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         carpetaSel = p.carpeta; panelVista = "carpeta"; pintarPanel()
     }
 
+    // ------------------------------------------------------------------ cursor (carros sin toque)
+    private val filasAccion = ArrayList<Pair<View, () -> Unit>>()
+    private var cursor = -1
+    private var usaCursor = false
+
+    private fun pintarCursor() {
+        filasAccion.forEach { it.first.foreground = null }
+        val v = filasAccion.getOrNull(cursor)?.first ?: return
+        v.foreground = GradientDrawable().apply { setStroke(dp(v.context, 3), Color.WHITE) }
+        val sv = panelScroll ?: return
+        if (v.top < sv.scrollY || v.bottom > sv.scrollY + sv.height)
+            sv.smoothScrollTo(0, maxOf(0, v.top - sv.height / 3))
+    }
+
+    /** Botones ▲ ▼ del carro: mueven el cuadro blanco por la lista. */
+    fun moverCursor(d: Int) {
+        if (!panelVisible) { mostrarPanel(); return }
+        if (filasAccion.isEmpty()) return
+        usaCursor = true
+        cursor = (cursor + d).coerceIn(0, filasAccion.size - 1)
+        pintarCursor(); tocado()
+    }
+
+    /** Botón ✓ del carro: elige la fila del cuadro blanco. */
+    fun elegirCursor() {
+        if (!panelVisible) { mostrarPanel(); return }
+        val f = filasAccion.getOrNull(cursor) ?: return
+        f.second(); tocado()
+    }
+
+    // ------------------------------------------------------------------ favorito con la estrella
+    private var estrella: TextView? = null
+
+    fun esFavoritoActual(): Boolean {
+        if (modo != Modo.CANALES) return false
+        val c = canalesLista.getOrNull(player.currentMediaItemIndex) ?: return false
+        return c.url in Datos.favoritos(ctx)
+    }
+
+    fun cambiarFavoritoActual() {
+        if (modo != Modo.CANALES) return
+        val c = canalesLista.getOrNull(player.currentMediaItemIndex) ?: return
+        val ahora = Datos.cambiarFavorito(ctx, c.url)
+        avisoBreve(if (ahora) "★ ${c.nombre} agregado a Favoritos" else "☆ ${c.nombre} quitado de Favoritos")
+        actualizarCapa()
+        alCambiar?.invoke()
+    }
+
+    private val quitarAvisoBreve = Runnable { ponerAviso("") }
+    private fun avisoBreve(t: String) {
+        ponerAviso(t)
+        main.removeCallbacks(quitarAvisoBreve)
+        main.postDelayed(quitarAvisoBreve, 2500)
+    }
+
+    // ------------------------------------------------------------------ línea de tiempo
+    private fun horaReloj(atrasMs: Long): String {
+        val hora = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date(System.currentTimeMillis() - atrasMs))
+        return if (atrasMs > 50_000) "$hora (−${hms(atrasMs)})" else hora
+    }
+
+    /** "Ir a EN VIVO": vuelve al directo (con su colchón de 30 s). */
+    fun irAlDirecto() {
+        if (modo != Modo.CANALES) return
+        player.seekToDefaultPosition()
+        player.play()
+        actualizarCapa()
+    }
+
+    // ------------------------------------------------------------------ búsqueda por voz
+    private var reconocedor: SpeechRecognizer? = null
+    @Volatile private var grabando = false
+    private var vozResultados: List<Canal> = emptyList()
+    private var vozTexto = ""
+    private var volumenAntes = 1f
+    var escuchando = false
+        private set
+
+    private val vozTiempo = Runnable {
+        if (escuchando) { detenerVoz(); avisoBreve("🎤 No te escuché. Toca 🎤 Voz otra vez") }
+    }
+
+    /** Botón 🎤 Voz: escucha el nombre del canal y lo pone (o muestra los parecidos). */
+    fun buscarPorVoz() {
+        if (ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            avisoBreve("🎤 Acepta en el celular el permiso del micrófono")
+            try {
+                ctx.requestPermissions(listOf(Manifest.permission.RECORD_AUDIO)) { ok, _ ->
+                    if (ok.contains(Manifest.permission.RECORD_AUDIO)) buscarPorVoz()
+                }
+            } catch (e: Exception) {}
+            return
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
+            avisoBreve("Este celular no tiene reconocimiento de voz")
+            vozTexto = ""; vozResultados = emptyList(); panelVista = "voz"; if (panelVisible) pintarPanel() else mostrarPanel()
+            return
+        }
+        // primero el micrófono del carro; si no se puede, el del celular
+        val conCarro = Build.VERSION.SDK_INT >= 33 && (try { ctx.carAppApiLevel >= 5 } catch (e: Exception) { false })
+        escuchar(conCarro)
+    }
+
+    private fun escuchar(conCarro: Boolean) {
+        detenerVoz()
+        escuchando = true
+        vozTexto = ""
+        volumenAntes = player.volume
+        player.volume = 0.1f                    // que el micrófono no oiga la TV
+        ponerAviso("🎤 Escuchando…
+di el nombre del canal")
+        val sr = try { SpeechRecognizer.createSpeechRecognizer(ctx) } catch (e: Exception) { null }
+        if (sr == null) { detenerVoz(); avisoBreve("No se pudo usar el micrófono"); return }
+        reconocedor = sr
+        sr.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() { ponerAviso("🎤 Buscando…") }
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+            override fun onPartialResults(r: Bundle?) {
+                val t = r?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                if (t.isNotBlank()) ponerAviso("🎤 «$t»")
+            }
+            override fun onResults(r: Bundle?) {
+                val textos = r?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: arrayListOf()
+                detenerVoz()
+                procesarVoz(textos)
+            }
+            override fun onError(error: Int) {
+                Registro.anotar(ctx, "   🎤 voz error $error (${if (conCarro) "micrófono del carro" else "micrófono del celular"})")
+                detenerVoz()
+                if (conCarro && error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                    escuchar(false)            // el micrófono del carro no funcionó: probar con el del celular
+                } else avisoBreve("🎤 No te entendí. Toca 🎤 Voz y di el nombre del canal")
+            }
+        })
+        val pedido = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-EC")
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, ctx.packageName)
+        }
+        if (conCarro && Build.VERSION.SDK_INT >= 33) {
+            try {
+                val rec = CarAudioRecord.create(ctx)
+                val tubo = ParcelFileDescriptor.createPipe()
+                pedido.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, tubo[0])
+                pedido.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)
+                pedido.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
+                pedido.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, CarAudioRecord.AUDIO_CONTENT_SAMPLING_RATE)
+                grabando = true
+                Thread {
+                    val salida = ParcelFileDescriptor.AutoCloseOutputStream(tubo[1])
+                    try {
+                        rec.startRecording()
+                        val buf = ByteArray(CarAudioRecord.AUDIO_CONTENT_BUFFER_SIZE)
+                        while (grabando) {
+                            val n = rec.read(buf, 0, buf.size)
+                            if (n <= 0) break
+                            salida.write(buf, 0, n)
+                        }
+                    } catch (e: Exception) {
+                    } finally {
+                        try { rec.stopRecording() } catch (e: Exception) {}
+                        try { salida.close() } catch (e: Exception) {}
+                    }
+                }.start()
+            } catch (e: Exception) {
+                Registro.anotar(ctx, "   🎤 micrófono del carro no disponible: ${e.javaClass.simpleName}")
+                grabando = false
+                main.post { escuchar(false) }
+                return
+            }
+        }
+        try { sr.startListening(pedido) } catch (e: Exception) { detenerVoz(); avisoBreve("No se pudo usar el micrófono"); return }
+        main.removeCallbacks(vozTiempo)
+        main.postDelayed(vozTiempo, 15_000)
+        alCambiar?.invoke()
+    }
+
+    private fun detenerVoz() {
+        main.removeCallbacks(vozTiempo)
+        grabando = false
+        try { reconocedor?.destroy() } catch (e: Exception) {}
+        reconocedor = null
+        if (escuchando) { player.volume = volumenAntes; ponerAviso("") }
+        escuchando = false
+    }
+
+    private val palabrasDeMas = setOf("pon", "ponme", "poner", "pone", "quiero", "ver", "canal", "el", "la", "en", "de", "por", "favor", "abre", "abrir")
+
+    private fun normal(t: String): String {
+        val sinTildes = Normalizer.normalize(t.lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
+        return sinTildes.replace(Regex("\\(.*?\\)|\\[.*?]"), " ").replace(Regex("[^a-z0-9 ]"), " ")
+            .split(Regex("\\s+")).filter { it.isNotEmpty() && it !in setOf("hd", "fhd", "sd", "uhd", "4k") }.joinToString(" ")
+    }
+
+    private fun distancia(a: String, b: String): Int {
+        val d = IntArray(b.length + 1) { it }
+        for (i in 1..a.length) {
+            var prev = d[0]; d[0] = i
+            for (j in 1..b.length) {
+                val t = d[j]
+                d[j] = minOf(d[j] + 1, d[j - 1] + 1, prev + if (a[i - 1] == b[j - 1]) 0 else 1)
+                prev = t
+            }
+        }
+        return d[b.length]
+    }
+
+    private fun parecido(a: String, b: String): Int {
+        if (a.isEmpty() || b.isEmpty()) return 0
+        return (100 * (1f - distancia(a, b).toFloat() / maxOf(a.length, b.length))).toInt()
+    }
+
+    /** Qué tanto se parece lo dicho al nombre del canal (0 a 100). */
+    private fun puntaje(dicho: String, nombre: String): Int {
+        val d = normal(dicho).split(" ").filter { it !in palabrasDeMas }.joinToString(" ")
+        val n = normal(nombre)
+        if (d.isEmpty() || n.isEmpty()) return 0
+        val dj = d.replace(" ", ""); val nj = n.replace(" ", "")
+        if (dj == nj) return 100
+        if (nj.startsWith(dj) && dj.length >= 3) return 90
+        if (nj.contains(dj) && dj.length >= 3) return 80
+        if (dj.contains(nj) && nj.length >= 3) return 75
+        val pd = d.split(" "); val pn = n.split(" ")
+        val todas = pd.all { w -> pn.any { it == w || (w.length >= 4 && parecido(w, it) >= 75) } }
+        if (todas) return 70
+        return parecido(dj, nj)
+    }
+
+    private fun procesarVoz(textos: List<String>) {
+        vozTexto = textos.firstOrNull().orEmpty()
+        Registro.anotar(ctx, "   🎤 dijo: ${textos.joinToString(" | ")}")
+        val todos = canales()
+        val ranking = todos.map { c -> c to textos.maxOfOrNull { puntaje(it, c.nombre) }.let { it ?: 0 } }
+            .filter { it.second >= 60 }.sortedByDescending { it.second }
+        vozResultados = ranking.take(20).map { it.first }
+        val primero = ranking.getOrNull(0)
+        val segundo = ranking.getOrNull(1)
+        if (primero != null && primero.second >= 80 && (segundo == null || segundo.second < primero.second)) {
+            // uno solo claro: se pone directo
+            grupoSel = null
+            ponerCanales(todos, todos.indexOf(primero.first))
+            avisoBreve("🎤 ${primero.first.nombre}")
+            panelVista = "canales"
+            if (panelVisible) pintarPanel()
+        } else {
+            // varios parecidos (o ninguno): se muestran para elegir
+            panelVista = "voz"
+            if (panelVisible) pintarPanel() else mostrarPanel()
+        }
+        alCambiar?.invoke()
+    }
+
     /** Se esconde sola a los 12 s sin tocar (si está en pausa se queda). */
-    private val ocultarSolo = Runnable { if (player.isPlaying) ocultarPanel() else tocado() }
+    private val ocultarSolo = Runnable { if (player.isPlaying && !escuchando) ocultarPanel() else tocado() }
     private fun tocado() { main.removeCallbacks(ocultarSolo); if (panelVisible) main.postDelayed(ocultarSolo, 12_000) }
 
     fun mostrarPanel() {
@@ -1093,6 +1429,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     fun ocultarPanel() {
         capa?.visibility = View.GONE
         panelVisible = false
+        usaCursor = false
         main.removeCallbacks(ocultarSolo); main.removeCallbacks(refresco)
         alCambiar?.invoke()
     }
@@ -1226,6 +1563,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         guardarAvance(true)
         main.removeCallbacksAndMessages(null)
         try { ctx.getSystemService(LocationManager::class.java).removeUpdates(gps) } catch (e: Exception) {}
+        detenerVoz()
         liberarPantalla()
         hiloLogos.shutdownNow()
         player.release()
@@ -1239,6 +1577,11 @@ class Barra(c: android.content.Context) : View(c) {
         set(v) { field = v.coerceIn(0f, 1f); invalidate() }
     var colorRelleno = Color.WHITE
         set(v) { field = v; invalidate() }
+    /** Parte ya guardada (colchón) de la línea de tiempo. */
+    var guardado = 0f
+        set(v) { field = v.coerceIn(0f, 1f); invalidate() }
+    var colorGuardado = 0x66FFFFFF
+        set(v) { field = v; invalidate() }
     var alTocar: ((Float) -> Unit)? = null
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
 
@@ -1249,6 +1592,10 @@ class Barra(c: android.content.Context) : View(c) {
         val x0 = r; val x1 = width - r
         p.color = 0x55FFFFFF
         cv.drawRoundRect(x0, mitad - grueso / 2, x1, mitad + grueso / 2, grueso, grueso, p)
+        if (guardado > 0f) {
+            p.color = colorGuardado
+            cv.drawRoundRect(x0, mitad - grueso / 2, x0 + (x1 - x0) * guardado, mitad + grueso / 2, grueso, grueso, p)
+        }
         val xf = x0 + (x1 - x0) * avance
         p.color = colorRelleno
         cv.drawRoundRect(x0, mitad - grueso / 2, xf, mitad + grueso / 2, grueso, grueso, p)
@@ -1289,18 +1636,31 @@ class PantallaVideo(ctx: CarContext, private val tv: VideoCarro) : Screen(ctx) {
 
     override fun onGetTemplate(): Template {
         val pelis = tv.modo == Modo.PELICULAS
+        // ☰ Lista muestra la lista ENCIMA del video (no se sale de la pantalla); ✕ la quita.
         val strip = ActionStrip.Builder()
-            .addAction(Action.Builder().setTitle(if (tv.panelVisible) "✕" else "☰ Menú").setOnClickListener {
-                if (tv.aceptaToques()) tv.alternarPanel() else tv.irA(PantallaMenu(carContext, tv))
+            .addAction(Action.Builder().setTitle(if (tv.panelVisible) "✕" else "☰ Lista").setOnClickListener {
+                tv.alternarPanel()
             }.build())
-            .addAction(icono(if (pelis) R.drawable.ic_atras else R.drawable.ic_anterior) { tv.anterior() })
-            .addAction(icono(if (tv.player.playWhenReady) R.drawable.ic_pausa else R.drawable.ic_play) { tv.pausaSigue() })
-            .addAction(icono(if (pelis) R.drawable.ic_adelante else R.drawable.ic_siguiente) { tv.siguiente() })
-            .build()
-        // El botón de "mover" hace que Android Auto pase los toques y el deslizar del dedo a la pantalla
-        // (igual que Fermata Auto). Así se puede tocar y deslizar la lista de canales del costado.
-        return NavigationTemplate.Builder().setActionStrip(strip)
-            .setMapActionStrip(ActionStrip.Builder().addAction(Action.PAN).build()).build()
+        if (tv.panelVisible) {
+            strip.addAction(Action.Builder().setTitle("🎤 Voz").setOnClickListener { tv.buscarPorVoz() }.build())
+            strip.addAction(icono(if (tv.player.playWhenReady) R.drawable.ic_pausa else R.drawable.ic_play) { tv.pausaSigue() })
+            if (!pelis) strip.addAction(Action.Builder().setTitle(if (tv.esFavoritoActual()) "★" else "☆")
+                .setOnClickListener { tv.cambiarFavoritoActual() }.build())
+        } else {
+            strip.addAction(icono(if (pelis) R.drawable.ic_atras else R.drawable.ic_anterior) { tv.anterior() })
+            strip.addAction(icono(if (tv.player.playWhenReady) R.drawable.ic_pausa else R.drawable.ic_play) { tv.pausaSigue() })
+            strip.addAction(icono(if (pelis) R.drawable.ic_adelante else R.drawable.ic_siguiente) { tv.siguiente() })
+        }
+        // Botones del costado: ▲ ▼ ✓ para moverse por la lista sin tocar la pantalla, y el de "mover",
+        // que hace que Android Auto pase los toques y el deslizar del dedo (igual que Fermata Auto).
+        val mapa = ActionStrip.Builder()
+        if (tv.panelVisible) {
+            mapa.addAction(icono(R.drawable.ic_arriba) { tv.moverCursor(-1) })
+            mapa.addAction(icono(R.drawable.ic_abajo) { tv.moverCursor(1) })
+            mapa.addAction(icono(R.drawable.ic_ok) { tv.elegirCursor() })
+        }
+        mapa.addAction(Action.PAN)
+        return NavigationTemplate.Builder().setActionStrip(strip.build()).setMapActionStrip(mapa.build()).build()
     }
 }
 

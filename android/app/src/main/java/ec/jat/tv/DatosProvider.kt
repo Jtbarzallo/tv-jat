@@ -51,6 +51,7 @@ class DatosProvider : ContentProvider() {
             "modoPasajero" -> Datos.setModoPasajero(ctx, arg == "1")
             "formaImagen" -> Datos.setFormaImagen(ctx, if (arg == "B") "B" else "A")
             "ajusteImagen" -> Datos.setAjusteImagen(ctx, if (arg == "entera") "entera" else "completa")
+            "favorito" -> if (!arg.isNullOrEmpty()) b.putBoolean("es", Datos.cambiarFavorito(ctx, arg))
             "calidad" -> Datos.setCalidad(ctx, if (arg == "alta" || arg == "ahorro") arg else "auto")
             "guardarProgreso" -> {
                 val json = extras?.getString("json")
