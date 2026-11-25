@@ -130,6 +130,13 @@ object Datos {
         guardarRespaldo(ctx)
     }
 
+    /** Calidad máxima de la imagen en el carro: "auto" (720p), "alta" (1080p) o "ahorro" (480p). */
+    fun calidad(ctx: Context) = prefs(ctx).getString("calidad", "auto") ?: "auto"
+    fun setCalidad(ctx: Context, v: String) {
+        prefs(ctx).edit().putString("calidad", v).apply()
+        guardarRespaldo(ctx)
+    }
+
     // ---------- último canal ----------
     fun ultimo(ctx: Context): String = prefs(ctx).getString("ultimo", "") ?: ""
     fun guardarUltimo(ctx: Context, url: String) {
@@ -152,6 +159,7 @@ object Datos {
         .put("modoPasajero", modoPasajero(ctx))
         .put("formaImagen", formaImagen(ctx))
         .put("ajusteImagen", ajusteImagen(ctx))
+        .put("calidad", calidad(ctx))
         .put("progresoPeliculas", Peliculas.progresoJson(ctx))
         .put("listaM3u", textoLista(ctx) ?: "")
         .toString(2)
@@ -183,6 +191,7 @@ object Datos {
             .putBoolean("modoPasajero", json.optBoolean("modoPasajero", true))
             .putString("formaImagen", json.optString("formaImagen", "A"))
             .putString("ajusteImagen", json.optString("ajusteImagen", "completa"))
+            .putString("calidad", json.optString("calidad", "auto"))
             .apply()
         Peliculas.importar(ctx, json.optJSONObject("progresoPeliculas"))
         guardarRespaldo(ctx)

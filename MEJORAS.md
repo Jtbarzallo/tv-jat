@@ -66,6 +66,13 @@
       TODA la pantalla (Completa/Entera en ⚙); panel al costado con canales, grupos, Mis Películas y opciones
       que se toca y se desliza con el dedo mientras sigue el video (botón ☰ Canales o tocar la imagen).
       Diagnóstico: cuadros perdidos y pausas por carga.
+- [x] v1.15 (2026-11-24): 🚗 TV JAT Video con interfaz nueva estilo "TV del carro" (según foto de Jorge): barra
+      de arriba (📺 Canales · 🎬 Películas · TV JAT · 🔍), lista de canales a la DERECHA con número, logo y etiqueta
+      roja EN VIVO (el canal que suena resaltado en azul), botones redondos abajo (☰ Guía · Anterior · Pausa grande
+      · Siguiente · ✕ Cerrar TV) y barra de información (canal y grupo, barra de colchón en vivo o de avance en
+      películas —se toca para saltar—, ● EN VIVO, ⚙ Ajustes, 📶 Calidad 720p/1080p/480p). Aparece al abrir y al
+      tocar la imagen; se esconde sola a los 12 s si está reproduciendo. Se acomoda a la parte que Android Auto
+      no tapa.
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
       permite); para esos, instalar TV JAT directo en la Android TV.
 - [ ] Mis Películas: subtítulos .srt con el mismo nombre del video.
@@ -124,3 +131,6 @@
 - 2026-11-24: Jorge confirma que TV JAT Video ya sale en el carro y funciona. Pide video fluido "sin detenerse",
   imagen en toda la pantalla y opciones/canales a un costado → v1.14. Respaldo: nuevo dato "ajusteImagen"
   (completa/entera) en respaldo_tv_jat.json.
+- 2026-11-24: Jorge manda una foto de una app de TV para carro ("DriveTV") y pide "arregla jat tv, haz una interfaz
+  similar" → v1.15 interfaz nueva en TV JAT Video. Respaldo: nuevo dato "calidad" (auto/alta/ahorro) en
+  respaldo_tv_jat.json (se guarda en TV JAT por el puente, igual que los demás ajustes).

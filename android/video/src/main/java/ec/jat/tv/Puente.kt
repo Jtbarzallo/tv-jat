@@ -55,6 +55,8 @@ object Datos {
     fun setFormaImagen(ctx: Context, v: String) { Puente.llamar(ctx, "formaImagen", v); Puente.olvidar() }
     fun ajusteImagen(ctx: Context): String = Puente.estado(ctx).getString("ajusteImagen") ?: "completa"
     fun setAjusteImagen(ctx: Context, v: String) { Puente.llamar(ctx, "ajusteImagen", v); Puente.olvidar() }
+    fun calidad(ctx: Context): String = Puente.estado(ctx).getString("calidad") ?: "auto"
+    fun setCalidad(ctx: Context, v: String) { Puente.llamar(ctx, "calidad", v); Puente.olvidar() }
     fun progreso(ctx: Context): JSONObject = try { JSONObject(Puente.estado(ctx).getString("progreso") ?: "{}") } catch (e: Exception) { JSONObject() }
 }
 

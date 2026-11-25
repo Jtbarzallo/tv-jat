@@ -15,6 +15,7 @@
     <queries>
         <package android:name="ec.jat.tv" />
         <provider android:authorities="ec.jat.tv.datos" />
+        <provider android:authorities="ec.jat.tv.logos" />
     </queries>
 
     <application

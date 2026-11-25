@@ -29,6 +29,17 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
+import android.widget.ImageView
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Typeface
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
+import android.util.LruCache
+import java.util.Locale
+import java.util.concurrent.Executors
 import androidx.car.app.AppManager
 import androidx.car.app.CarAppService
 import androidx.car.app.CarContext
@@ -193,9 +204,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build())
             .build()
-        // No pedir más calidad de la que muestra la pantalla del carro (menos datos, menos trabajo)
-        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setMaxVideoSize(1280, 720).build()
+        // No pedir más calidad de la elegida (de fábrica 720p, como la pantalla del carro)
+        aplicarCalidad()
         player.addAnalyticsListener(object : AnalyticsListener {
             override fun onDroppedVideoFrames(et: AnalyticsListener.EventTime, droppedFrames: Int, elapsedMs: Long) {
                 cuadrosPerdidos += droppedFrames
@@ -227,6 +237,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (!isPlaying) guardarAvance(false)
+                actualizarCapa()
                 alCambiar?.invoke()
             }
 
@@ -441,6 +452,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         }
         aplicarArea()
         aplicarMovimiento()
+        // al abrir, mostrar la interfaz unos segundos para que se vea cómo usarla
+        if (capa != null) main.postDelayed({ if (capa != null && !panelVisible) mostrarPanel() }, 800)
         Registro.anotar(ctx, "   pantalla del carro: $dPantalla · forma $dForma")
     }
 
@@ -450,7 +463,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     }
 
     override fun onStableAreaChanged(stableArea: Rect) {
-        if (area == null) { area = Rect(stableArea); aplicarArea() }
+        areaEstable = Rect(stableArea)
+        aplicarArea()
     }
 
     override fun onSurfaceDestroyed(sc: SurfaceContainer) {
@@ -474,8 +488,9 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val t = TextView(c).apply {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            setBackgroundColor(0x99000000.toInt())
-            setPadding(dp(c, 12), dp(c, 6), dp(c, 12), dp(c, 6))
+            setTypeface(typeface, Typeface.BOLD)
+            background = redondo(0xB3000000.toInt(), dp(c, 8).toFloat())
+            setPadding(dp(c, 14), dp(c, 8), dp(c, 14), dp(c, 8))
             visibility = View.GONE
         }
         raiz.addView(t, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START))
@@ -483,25 +498,29 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             gravity = Gravity.CENTER
-            setBackgroundColor(0xCC000000.toInt())
+            background = redondo(0xCC000000.toInt(), dp(c, 12).toFloat())
             setPadding(dp(c, 20), dp(c, 14), dp(c, 20), dp(c, 14))
             visibility = View.GONE
         }
         raiz.addView(a, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
         vista = marco; titulo = t; aviso = a
-        armarPanel(c, raiz)
+        armarCapa(c, raiz)
         raizVista = raiz
         return raiz
     }
 
-    /** El video ocupa solo la parte de la pantalla que no tapan los botones de Android Auto. */
+    /** La interfaz se acomoda a la parte de la pantalla que Android Auto deja libre; el video ocupa todo. */
     private fun aplicarArea() {
-        val r = area ?: return
         if (ancho <= 0 || alto <= 0) return
-        // el video ocupa TODA la pantalla; solo el panel y el título se acomodan a la parte libre
+        val r = areaUsable()
+        capa?.let { v ->
+            val lp = v.layoutParams as FrameLayout.LayoutParams
+            lp.setMargins(r.left, r.top, maxOf(0, ancho - r.right), maxOf(0, alto - r.bottom))
+            v.layoutParams = lp
+        }
         panel?.let { v ->
             val lp = v.layoutParams as FrameLayout.LayoutParams
-            lp.setMargins(r.left, r.top, 0, maxOf(0, alto - r.bottom))
+            lp.width = (r.width() * 0.36f).toInt().coerceAtLeast(dp(v.context, 230)).coerceAtMost((r.width() * 0.5f).toInt())
             v.layoutParams = lp
         }
         titulo?.let { v ->
@@ -511,6 +530,15 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         }
     }
 
+    /** Parte fija que Android Auto nunca tapa (si no la manda, la visible; si no, toda). */
+    private fun areaUsable(): Rect {
+        val e = areaEstable
+        if (e != null && e.width() > 100 && e.height() > 100) return e
+        val v = area
+        if (v != null && v.width() > 100 && v.height() > 100) return v
+        return Rect(0, 0, ancho, alto)
+    }
+
     private fun liberarPantalla() {
         textura?.let { player.clearVideoTextureView(it) }
         textura = null
@@ -518,7 +546,12 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         try { vd?.release() } catch (e: Exception) {}
         if (directa) player.clearVideoSurface()
         pres = null; vd = null; vista = null; titulo = null; aviso = null
-        panel = null; panelLista = null; panelScroll = null; raizVista = null; panelVisible = false
+        capa = null; panel = null; panelLista = null; panelScroll = null; panelTitulo = null; raizVista = null
+        chipCanales = null; chipPelis = null; btnPausa = null; btnAnt = null; btnSig = null; lblAnt = null; lblSig = null
+        infoNombre = null; infoSub = null; infoTiempo = null; infoVivo = null; infoCalidad = null; barra = null
+        filasLogo.clear(); filaMarcada = null
+        panelVisible = false
+        main.removeCallbacks(refresco); main.removeCallbacks(ocultarSolo)
         superficie = null; directa = false
     }
 
@@ -526,6 +559,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     private fun mostrarTitulo(texto: String) {
         val t = titulo ?: return
+        if (panelVisible) return       // la barra de abajo ya dice el nombre
         t.text = texto
         t.visibility = View.VISIBLE
         main.removeCallbacks(ocultarTitulo)
@@ -546,12 +580,36 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         a.visibility = if (txt.isEmpty()) View.GONE else View.VISIBLE
     }
 
-    // ------------------------------------------------------------------ panel al costado
+    // ------------------------------------------------------------------ interfaz sobre el video
+    // Diseño: barra de arriba (Canales · Películas · TV JAT · 🔍), lista de canales a la derecha,
+    // botones redondos abajo (Guía · Anterior · Pausa · Siguiente · Cerrar TV) y barra de información
+    // (canal, avance/colchón, EN VIVO, Ajustes, Calidad).
+    private val AZUL_SEL = 0xFF1F3B5E.toInt()
+    private val ACENTO = 0xFF2F8BFF.toInt()
+    private val ROJO = 0xFFE53935.toInt()
+    private val GRIS = 0xFFB4BAC2.toInt()
+    private val BOTON = 0xCC3A3F47.toInt()
+
     private var raizVista: FrameLayout? = null
+    private var capa: FrameLayout? = null
     private var panel: LinearLayout? = null
     private var panelScroll: ScrollView? = null
     private var panelLista: LinearLayout? = null
     private var panelTitulo: TextView? = null
+    private var chipCanales: TextView? = null
+    private var chipPelis: TextView? = null
+    private var btnPausa: ImageView? = null
+    private var btnAnt: ImageView? = null
+    private var btnSig: ImageView? = null
+    private var lblAnt: TextView? = null
+    private var lblSig: TextView? = null
+    private var infoNombre: TextView? = null
+    private var infoSub: TextView? = null
+    private var infoTiempo: TextView? = null
+    private var infoVivo: TextView? = null
+    private var infoCalidad: TextView? = null
+    private var barra: Barra? = null
+    private var areaEstable: Rect? = null
     var panelVisible = false
         private set
     private var panelVista = "canales"      // canales · grupos · pelis · carpeta · opciones
@@ -570,43 +628,338 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         if (panelVisible) pintarPanel()
     }
 
-    private fun armarPanel(c: android.content.Context, raiz: FrameLayout) {
-        val ancho = (this.ancho * 0.42f).toInt().coerceIn(dp(c, 260), dp(c, 460))
-        val pn = LinearLayout(c).apply {
+    // calidad máxima de la imagen (menos calidad = menos datos y menos cortes)
+    fun calidadTexto() = when (Datos.calidad(ctx)) { "alta" -> "1080p"; "ahorro" -> "480p"; else -> "720p" }
+
+    private fun aplicarCalidad() {
+        val (w, h) = when (Datos.calidad(ctx)) { "alta" -> 1920 to 1080; "ahorro" -> 854 to 480; else -> 1280 to 720 }
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setMaxVideoSize(w, h).build()
+    }
+
+    fun cambiarCalidad() {
+        val sig = when (Datos.calidad(ctx)) { "auto" -> "alta"; "alta" -> "ahorro"; else -> "auto" }
+        Datos.setCalidad(ctx, sig)
+        aplicarCalidad()
+        ponerAviso(""); actualizarCapa()
+        if (panelVista == "opciones") pintarPanel()
+    }
+
+    private fun redondo(color: Int, radio: Float = -1f) = GradientDrawable().apply {
+        if (radio < 0) shape = GradientDrawable.OVAL else cornerRadius = radio
+        setColor(color)
+    }
+
+    private fun degradado(arribaOscuro: Boolean, oscuro: Int) = GradientDrawable(
+        GradientDrawable.Orientation.TOP_BOTTOM,
+        if (arribaOscuro) intArrayOf(oscuro, 0x00000000) else intArrayOf(0x00000000, oscuro)
+    )
+
+    private fun chip(c: android.content.Context, txt: String, accion: () -> Unit) = TextView(c).apply {
+        text = txt
+        setTextColor(Color.WHITE)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+        setPadding(dp(c, 12), dp(c, 6), dp(c, 12), dp(c, 6))
+        setOnClickListener { accion(); tocado() }
+    }
+
+    private class Boton(val vista: LinearLayout, val icono: ImageView?, val texto: TextView)
+
+    private fun boton(c: android.content.Context, icono: Int, glifo: String, etiqueta: String,
+                      fondo: Int, tinte: Int, tam: Int, accion: () -> Unit): Boton {
+        val caja = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xEE10142A.toInt())
-            visibility = View.GONE
-        }
-        // pestañas
-        val tabs = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL }
-        fun tab(txt: String, accion: () -> Unit) = TextView(c).apply {
-            text = txt
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            gravity = Gravity.CENTER
-            setPadding(dp(c, 4), dp(c, 14), dp(c, 4), dp(c, 14))
-            setBackgroundColor(0xFF1E2440.toInt())
+            gravity = Gravity.CENTER_HORIZONTAL
             setOnClickListener { accion(); tocado() }
         }
-        val lpTab = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(1, 0, 1, 0) }
-        tabs.addView(tab("📺") { panelVista = if (panelVista == "canales") "grupos" else "canales"; pintarPanel() }, lpTab)
-        tabs.addView(tab("🎬") { panelVista = "pelis"; pintarPanel() }, lpTab)
-        tabs.addView(tab("⚙") { panelVista = "opciones"; pintarPanel() }, lpTab)
-        tabs.addView(tab("✕") { ocultarPanel() }, lpTab)
-        pn.addView(tabs)
+        val circulo = FrameLayout(c).apply { background = redondo(fondo) }
+        var img: ImageView? = null
+        if (icono != 0) {
+            img = ImageView(c).apply { setImageResource(icono); setColorFilter(tinte) }
+            val m = tam / 4
+            circulo.addView(img, FrameLayout.LayoutParams(dp(c, tam - 2 * m), dp(c, tam - 2 * m), Gravity.CENTER))
+        } else {
+            circulo.addView(TextView(c).apply {
+                text = glifo; setTextColor(tinte); gravity = Gravity.CENTER
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, tam * 0.42f)
+                setTypeface(typeface, Typeface.BOLD)
+            }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        caja.addView(circulo, LinearLayout.LayoutParams(dp(c, tam), dp(c, tam)))
+        val t = TextView(c).apply {
+            text = etiqueta; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setShadowLayer(4f, 0f, 1f, Color.BLACK)
+            setPadding(0, dp(c, 3), 0, 0)
+        }
+        caja.addView(t)
+        return Boton(caja, img, t)
+    }
+
+    private fun miniBoton(c: android.content.Context, glifo: String, etiqueta: String, accion: () -> Unit): Pair<View, TextView> {
+        val caja = LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(c, 10), dp(c, 2), dp(c, 10), dp(c, 2))
+            setOnClickListener { accion(); tocado() }
+        }
+        caja.addView(TextView(c).apply { text = glifo; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f) })
+        val t = TextView(c).apply { text = etiqueta; setTextColor(GRIS); gravity = Gravity.CENTER; setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f) }
+        caja.addView(t)
+        return caja to t
+    }
+
+    private fun armarCapa(c: android.content.Context, raiz: FrameLayout) {
+        val cp = FrameLayout(c).apply {
+            visibility = View.GONE
+            setOnClickListener { ocultarPanel() }      // tocar la imagen (fuera de botones) esconde todo
+        }
+
+        // ---- barra de arriba
+        val arriba = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = degradado(true, 0xDD000000.toInt())
+            setPadding(dp(c, 8), 0, dp(c, 8), 0)
+            setOnClickListener { tocado() }
+        }
+        val cc = chip(c, "📺 Canales") { panelVista = "canales"; pintarPanel() }
+        val cpel = chip(c, "🎬 Películas") { panelVista = if (carpetaSel.isNotEmpty() && modo == Modo.PELICULAS) "carpeta" else "pelis"; pintarPanel() }
+        arriba.addView(cc); arriba.addView(cpel)
+        arriba.addView(TextView(c).apply {
+            text = "TV JAT"; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f); setTypeface(typeface, Typeface.BOLD)
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        arriba.addView(chip(c, "🔍") { ocultarPanel(); irA(PantallaBuscar(ctx, this)) }.apply { setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f) })
+        cp.addView(arriba, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, 50), Gravity.TOP))
+
+        // ---- lista al costado derecho
+        val pn = LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL
+            background = redondo(0xE6151920.toInt(), dp(c, 10).toFloat())
+            clipToOutline = true
+            setOnClickListener { tocado() }
+        }
         val tt = TextView(c).apply {
-            setTextColor(0xFF4FD1C5.toInt())
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-            setPadding(dp(c, 14), dp(c, 10), dp(c, 14), dp(c, 8))
-            setOnClickListener { if (panelVista == "canales") { panelVista = "grupos"; pintarPanel() } else if (panelVista == "carpeta") { panelVista = "pelis"; pintarPanel() }; tocado() }
+            setTextColor(ACENTO)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(dp(c, 12), dp(c, 8), dp(c, 12), dp(c, 6))
+            setOnClickListener {
+                panelVista = when (panelVista) { "canales" -> "grupos"; "carpeta" -> "pelis"; "grupos" -> "canales"; else -> panelVista }
+                pintarPanel(); tocado()
+            }
         }
         pn.addView(tt)
-        val sv = ScrollView(c).apply { isVerticalScrollBarEnabled = true }
+        val sv = ScrollView(c).apply {
+            isVerticalScrollBarEnabled = true
+            setOnScrollChangeListener { _, _, _, _, _ -> cargarLogosVisibles() }
+        }
         val ll = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
         sv.addView(ll)
         pn.addView(sv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        raiz.addView(pn, FrameLayout.LayoutParams(ancho, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START))
-        panel = pn; panelScroll = sv; panelLista = ll; panelTitulo = tt
+        cp.addView(pn, FrameLayout.LayoutParams((ancho * 0.36f).toInt().coerceAtLeast(dp(c, 230)), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END or Gravity.TOP).apply {
+            topMargin = dp(c, 52); bottomMargin = dp(c, 150); rightMargin = dp(c, 8)
+        })
+
+        // ---- abajo: botones redondos + barra de información
+        val abajo = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL; setOnClickListener { tocado() } }
+        val controles = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = degradado(false, 0xAA000000.toInt())
+            setPadding(dp(c, 8), dp(c, 10), dp(c, 8), dp(c, 6))
+        }
+        val lpB = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        val guia = boton(c, 0, "☰", "Guía", BOTON, Color.WHITE, 48) { panelVista = "grupos"; pintarPanel() }
+        val ant = boton(c, R.drawable.ic_anterior, "", "Anterior", BOTON, Color.WHITE, 48) { anterior() }
+        val pau = boton(c, R.drawable.ic_pausa, "", "Pausa", Color.WHITE, ROJO, 60) { pausaSigue(); actualizarCapa() }
+        val sig = boton(c, R.drawable.ic_siguiente, "", "Siguiente", BOTON, Color.WHITE, 48) { siguiente() }
+        val cer = boton(c, 0, "✕", "Cerrar TV", ROJO, Color.WHITE, 48) { cerrar() }
+        listOf(guia, ant, pau, sig, cer).forEach { controles.addView(it.vista, lpB) }
+        abajo.addView(controles)
+
+        val info = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(0xF0121519.toInt())
+            setPadding(dp(c, 16), dp(c, 6), dp(c, 6), dp(c, 6))
+        }
+        val izq = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
+        val nom = TextView(c).apply {
+            setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 19f); setTypeface(typeface, Typeface.BOLD)
+            maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+        }
+        val sub = TextView(c).apply {
+            setTextColor(GRIS); setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+        }
+        izq.addView(nom); izq.addView(sub)
+        info.addView(izq, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.1f))
+        val centro = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(c, 12), 0, dp(c, 8), 0) }
+        val br = Barra(c).apply {
+            alTocar = { f ->
+                if (modo == Modo.PELICULAS && player.duration > 0) { player.seekTo((player.duration * f).toLong()); actualizarCapa() }
+                tocado()
+            }
+        }
+        centro.addView(br, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, 20)))
+        val filaT = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val tiempo = TextView(c).apply { setTextColor(GRIS); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); maxLines = 1 }
+        filaT.addView(tiempo, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val vivo = TextView(c).apply {
+            text = "● EN VIVO"; setTextColor(ROJO); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTypeface(typeface, Typeface.BOLD)
+        }
+        filaT.addView(vivo)
+        centro.addView(filaT)
+        info.addView(centro, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.3f))
+        val (aj, _) = miniBoton(c, "⚙", "Ajustes") { panelVista = "opciones"; pintarPanel() }
+        val (ca, caTxt) = miniBoton(c, "📶", "Calidad") { cambiarCalidad() }
+        info.addView(aj); info.addView(ca)
+        abajo.addView(info)
+        cp.addView(abajo, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+
+        raiz.addView(cp, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        capa = cp; panel = pn; panelScroll = sv; panelLista = ll; panelTitulo = tt
+        chipCanales = cc; chipPelis = cpel
+        btnPausa = pau.icono; btnAnt = ant.icono; btnSig = sig.icono; lblAnt = ant.texto; lblSig = sig.texto
+        infoNombre = nom; infoSub = sub; infoTiempo = tiempo; infoVivo = vivo; infoCalidad = caTxt; barra = br
+    }
+
+    private fun hms(ms: Long): String {
+        val s = (ms / 1000).coerceAtLeast(0)
+        return if (s >= 3600) String.format(Locale.US, "%d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60)
+        else String.format(Locale.US, "%d:%02d", s / 60, s % 60)
+    }
+
+    /** Pone al día botones, nombre, barra de avance/colchón y calidad. */
+    fun actualizarCapa() {
+        if (!panelVisible) return
+        val pelis = modo == Modo.PELICULAS
+        btnPausa?.setImageResource(if (player.playWhenReady) R.drawable.ic_pausa else R.drawable.ic_play)
+        btnAnt?.setImageResource(if (pelis) R.drawable.ic_atras else R.drawable.ic_anterior)
+        btnSig?.setImageResource(if (pelis) R.drawable.ic_adelante else R.drawable.ic_siguiente)
+        lblAnt?.text = if (pelis) "−10 s" else "Anterior"
+        lblSig?.text = if (pelis) "+30 s" else "Siguiente"
+        val enPelis = panelVista == "pelis" || panelVista == "carpeta"
+        val enCanales = panelVista == "canales" || panelVista == "grupos"
+        chipCanales?.background = if (enCanales) redondo(AZUL_SEL, 40f) else null
+        chipPelis?.background = if (enPelis) redondo(AZUL_SEL, 40f) else null
+        val i = player.currentMediaItemIndex
+        if (pelis) {
+            val p = pelisLista.getOrNull(i)
+            infoNombre?.text = p?.titulo ?: "Mis Películas"
+            infoSub?.text = if (p != null) "${p.carpeta} · ${i + 1} de ${pelisLista.size}" else ""
+        } else {
+            val c = canalesLista.getOrNull(i)
+            infoNombre?.text = c?.nombre ?: "Sin canal"
+            infoSub?.text = if (c != null) "${grupoDe(c)} · Canal ${i + 1} de ${canalesLista.size}" else "Toca ☰ Guía para elegir"
+        }
+        val dur = player.duration
+        val pos = player.currentPosition
+        val enVivo = !pelis && (player.isCurrentMediaItemLive || dur == C.TIME_UNSET || dur <= 0)
+        val br = barra
+        if (enVivo) {
+            val colchon = (player.bufferedPosition - pos).coerceAtLeast(0)
+            br?.colorRelleno = ACENTO
+            br?.avance = colchon / 30_000f
+            infoTiempo?.text = "Colchón: ${colchon / 1000} s"
+            infoVivo?.visibility = View.VISIBLE
+        } else {
+            br?.colorRelleno = ROJO
+            br?.avance = if (dur > 0) pos.toFloat() / dur else 0f
+            infoTiempo?.text = if (dur > 0) "${hms(pos)} / ${hms(dur)}" else hms(pos)
+            infoVivo?.visibility = View.GONE
+        }
+        infoCalidad?.text = "Calidad ${calidadTexto()}"
+    }
+
+    private val refresco = object : Runnable {
+        override fun run() {
+            if (!panelVisible) return
+            actualizarCapa()
+            main.postDelayed(this, 1000)
+        }
+    }
+
+    // ---- filas de la lista
+    private val filasLogo = ArrayList<Pair<View, ImageView>>()
+    private var filaMarcada: View? = null
+    private val logos = LruCache<String, Bitmap>(150)
+    private val pedidosLogo = HashSet<String>()
+    private val hiloLogos = Executors.newSingleThreadExecutor()
+
+    private fun iniciales(nombre: String): String {
+        val limpio = nombre.replace(Regex("\\(.*?\\)|\\[.*?]"), " ").trim()
+        return limpio.split(Regex("\\s+")).filter { it.isNotEmpty() }.take(2)
+            .joinToString("") { it.take(1) }.uppercase().ifEmpty { "TV" }
+    }
+
+    /** Fila de canal como en la foto: número, logo, nombre y la etiqueta roja EN VIVO. */
+    private fun filaCanal(n: Int, c: Canal, marcada: Boolean, fav: Boolean, accion: () -> Unit) {
+        val ll = panelLista ?: return
+        val cx = ll.context
+        val f = LinearLayout(cx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(cx, 10), dp(cx, 8), dp(cx, 10), dp(cx, 8))
+            if (marcada) setBackgroundColor(AZUL_SEL)
+            setOnClickListener { accion(); tocado() }
+        }
+        val caja = FrameLayout(cx).apply { background = redondo(0xFF0D1F4A.toInt(), dp(cx, 6).toFloat()); clipToOutline = true }
+        caja.addView(TextView(cx).apply {
+            text = iniciales(c.nombre); setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTypeface(typeface, Typeface.BOLD)
+        }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        val img = ImageView(cx).apply { scaleType = ImageView.ScaleType.FIT_CENTER; tag = c }
+        caja.addView(img, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        f.addView(caja, LinearLayout.LayoutParams(dp(cx, 44), dp(cx, 44)))
+        val textos = LinearLayout(cx).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(cx, 10), 0, 0, 0) }
+        textos.addView(TextView(cx).apply {
+            text = "$n. " + (if (fav) "★ " else "") + c.nombre
+            setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            if (marcada) setTypeface(typeface, Typeface.BOLD)
+            maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+        })
+        textos.addView(TextView(cx).apply {
+            text = "EN VIVO"; setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            background = redondo(if (marcada) ROJO else 0xFF8E2A28.toInt(), dp(cx, 3).toFloat())
+            setPadding(dp(cx, 6), dp(cx, 1), dp(cx, 6), dp(cx, 1))
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(cx, 3) })
+        f.addView(textos, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        ll.addView(f)
+        if (marcada) {
+            ll.addView(View(cx).apply { setBackgroundColor(ACENTO) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(cx, 3)))
+            filaMarcada = f
+        } else ll.addView(View(cx).apply { setBackgroundColor(0x1FFFFFFF) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
+        filasLogo.add(f to img)
+    }
+
+    /** Logos: TV JAT los baja (LogoProvider) y aquí se piden solo los de las filas que se ven. */
+    private fun cargarLogosVisibles() {
+        val sv = panelScroll ?: return
+        val arriba = sv.scrollY - 300
+        val abajo = sv.scrollY + sv.height + 600
+        for ((f, img) in filasLogo) {
+            if (img.drawable != null || f.bottom < arriba || f.top > abajo) continue
+            val c = img.tag as? Canal ?: continue
+            if (c.logo.isBlank()) continue
+            val clave = c.logo + "|" + c.nombre
+            val enCache = logos.get(clave)
+            if (enCache != null) { img.setImageBitmap(enCache); continue }
+            if (!pedidosLogo.add(clave)) continue
+            val uri = Uri.Builder().scheme("content").authority("ec.jat.tv.logos").appendPath("logo")
+                .appendQueryParameter("u", c.logo).appendQueryParameter("n", c.nombre).build()
+            try {
+                hiloLogos.execute {
+                    val bmp = try { ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } } catch (e: Exception) { null }
+                    if (bmp != null) main.post {
+                        logos.put(clave, bmp); pedidosLogo.remove(clave)
+                        if (img.tag == c) img.setImageBitmap(bmp)
+                    }
+                }
+            } catch (e: Exception) {}
+        }
     }
 
     private fun fila(texto: String, sub: String = "", marcada: Boolean = false, accion: () -> Unit) {
@@ -614,29 +967,33 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val c = ll.context
         val v = TextView(c).apply {
             text = if (sub.isEmpty()) texto else "$texto\n$sub"
-            setTextColor(if (marcada) 0xFF4FD1C5.toInt() else Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            setTypeface(typeface, if (marcada) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
-            setPadding(dp(c, 16), dp(c, 14), dp(c, 12), dp(c, 14))
-            if (marcada) setBackgroundColor(0x334FD1C5)
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setTypeface(typeface, if (marcada) Typeface.BOLD else Typeface.NORMAL)
+            setPadding(dp(c, 14), dp(c, 12), dp(c, 12), dp(c, 12))
+            if (marcada) setBackgroundColor(AZUL_SEL)
             setOnClickListener { accion(); tocado() }
         }
         ll.addView(v)
-        ll.addView(View(c).apply { setBackgroundColor(0x22FFFFFF) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
+        if (marcada) {
+            ll.addView(View(c).apply { setBackgroundColor(ACENTO) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, 3)))
+            filaMarcada = v
+        } else ll.addView(View(c).apply { setBackgroundColor(0x1FFFFFFF) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
     }
 
     fun pintarPanel() {
         val ll = panelLista ?: return
         ll.removeAllViews()
+        filasLogo.clear(); filaMarcada = null
         panelScroll?.scrollTo(0, 0)
-        var marcada = -1
         when (panelVista) {
             "grupos" -> {
-                panelTitulo?.text = "Elige un grupo"
+                panelTitulo?.text = "☰ Guía · elige un grupo"
                 val todos = canales()
                 val fav = Datos.favoritos(ctx)
                 fila("★ Favoritos", "${todos.count { it.url in fav }} canales", grupoSel == "★") { grupoSel = "★"; panelVista = "canales"; pintarPanel() }
                 fila("📺 Todos", "${todos.size} canales", grupoSel == null) { grupoSel = null; panelVista = "canales"; pintarPanel() }
+                fila("🎬 Mis Películas", "Videos del celular") { panelVista = "pelis"; pintarPanel() }
                 todos.groupBy { grupoDe(it) }.toSortedMap(compareBy<String>({ it.lowercase() }, { it })).forEach { (g, l) ->
                     fila(g, "${l.size} canales", grupoSel == g) { grupoSel = g; panelVista = "canales"; pintarPanel() }
                 }
@@ -651,7 +1008,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                     val todas = try { Peliculas.buscar(ctx) } catch (e: Exception) { emptyList() }
                     val seguir = todas.filter { val a = Peliculas.avance(ctx, it); a > 0f && a < 1f }
                         .sortedByDescending { Peliculas.ultimaVez(ctx, it) }.take(5)
-                    seguir.forEach { p -> fila("▶ ${p.titulo}", "Seguir viendo") { ponerPeliDe(p, todas) } }
+                    seguir.forEach { p -> fila("▶ ${p.titulo}", "Seguir viendo · ${(Peliculas.avance(ctx, p) * 100).toInt()} %") { ponerPeliDe(p, todas) } }
                     todas.groupBy { it.carpeta }.toSortedMap(compareBy<String>({ it.lowercase() }, { it })).forEach { (cp, l) ->
                         fila("📁 $cp", "${l.size} videos") { carpetaSel = cp; panelVista = "carpeta"; pintarPanel() }
                     }
@@ -669,11 +1026,13 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 }
             }
             "opciones" -> {
-                panelTitulo?.text = "⚙ Opciones"
+                panelTitulo?.text = "⚙ Ajustes"
                 val entera = Datos.ajusteImagen(ctx) == "entera"
                 fila(if (entera) "🖼️ Imagen: ENTERA" else "🖼️ Imagen: COMPLETA",
-                    if (entera) "Se ve todo, con franjas negras. Toca para llenar la pantalla"
-                    else "Llena la pantalla (recorta bordes). Toca para verla entera") { cambiarAjuste() }
+                    if (entera) "Se ve todo, con franjas negras" else "Llena la pantalla (recorta bordes)") { cambiarAjuste() }
+                fila("📶 Calidad: ${calidadTexto()}", when (Datos.calidad(ctx)) {
+                    "alta" -> "Mejor imagen, gasta más datos"; "ahorro" -> "Menos datos y menos cortes"; else -> "Normal (como la pantalla del carro)"
+                }) { cambiarCalidad() }
                 val pasajero = Datos.modoPasajero(ctx)
                 fila(if (pasajero) "👥 Modo pasajero: ACTIVADO" else "👥 Modo pasajero: desactivado",
                     if (pasajero) "La imagen se ve con el carro en marcha" else "La imagen se tapa al avanzar") { cambiarModoPasajero(); pintarPanel() }
@@ -693,18 +1052,17 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 val fav = Datos.favoritos(ctx)
                 val actual = if (modo == Modo.CANALES) canalActual?.url else null
                 lista.take(500).forEachIndexed { i, c ->
-                    if (c.url == actual) marcada = i
-                    fila((if (c.url in fav) "★ " else "") + c.nombre, "", c.url == actual) {
-                        ponerCanales(lista, i); pintarPanel()
-                    }
+                    filaCanal(i + 1, c, c.url == actual, c.url in fav) { ponerCanales(lista, i); pintarPanel() }
                 }
                 if (lista.isEmpty()) fila("No hay canales aquí") {}
             }
         }
-        // llevar a la vista el canal que está sonando
-        if (marcada > 0) panelScroll?.post {
-            val v = panelLista?.getChildAt(marcada * 2) ?: return@post
-            panelScroll?.scrollTo(0, maxOf(0, v.top - dp(ll.context, 80)))
+        actualizarCapa()
+        // llevar a la vista el canal que está sonando y bajar los logos de lo que se ve
+        panelScroll?.post {
+            val v = filaMarcada
+            if (v != null) panelScroll?.scrollTo(0, maxOf(0, v.top - dp(ll.context, 60)))
+            cargarLogosVisibles()
         }
     }
 
@@ -714,37 +1072,44 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         carpetaSel = p.carpeta; panelVista = "carpeta"; pintarPanel()
     }
 
-    private val ocultarSolo = Runnable { ocultarPanel() }
-    private fun tocado() { main.removeCallbacks(ocultarSolo); if (panelVisible) main.postDelayed(ocultarSolo, 20_000) }
+    /** Se esconde sola a los 12 s sin tocar (si está en pausa se queda). */
+    private val ocultarSolo = Runnable { if (player.isPlaying) ocultarPanel() else tocado() }
+    private fun tocado() { main.removeCallbacks(ocultarSolo); if (panelVisible) main.postDelayed(ocultarSolo, 12_000) }
 
     fun mostrarPanel() {
-        val pn = panel
-        if (pn == null) { irA(PantallaMenu(ctx, this)); return }   // forma B: no hay dónde dibujar el panel
+        val cp = capa
+        if (cp == null) { irA(PantallaMenu(ctx, this)); return }   // forma B: no hay dónde dibujar
         if (panelVista == "canales" && modo == Modo.PELICULAS) panelVista = "carpeta"
         if (panelVista == "carpeta" && carpetaSel.isEmpty()) panelVista = "pelis"
-        pintarPanel()
-        pn.visibility = View.VISIBLE
         panelVisible = true
+        titulo?.visibility = View.GONE
+        pintarPanel()
+        cp.visibility = View.VISIBLE
         tocado()
+        main.removeCallbacks(refresco); main.post(refresco)
         alCambiar?.invoke()
     }
 
     fun ocultarPanel() {
-        panel?.visibility = View.GONE
+        capa?.visibility = View.GONE
         panelVisible = false
-        main.removeCallbacks(ocultarSolo)
+        main.removeCallbacks(ocultarSolo); main.removeCallbacks(refresco)
         alCambiar?.invoke()
     }
 
     fun alternarPanel() { if (panelVisible) ocultarPanel() else mostrarPanel() }
 
+    /** Botón "Cerrar TV": guarda, detiene y cierra TV JAT Video en el carro. */
+    fun cerrar() {
+        guardarAvance(true)
+        player.pause()
+        ocultarPanel()
+        try { ctx.finishCarApp() } catch (e: Exception) {}
+    }
+
     // toques en la pantalla del carro
     override fun onClick(x: Float, y: Float) {
-        val pn = panel
-        if (pn == null) { mostrarPanel(); return }
-        if (!panelVisible) { mostrarPanel(); return }
-        val r = Rect(); pn.getHitRect(r)
-        if (!r.contains(x.toInt(), y.toInt())) { ocultarPanel(); return }
+        if (capa == null || !panelVisible) { mostrarPanel(); return }
         val raiz = raizVista ?: return
         val t = SystemClock.uptimeMillis()
         val ab = MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x, y, 0)
@@ -862,8 +1227,43 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         main.removeCallbacksAndMessages(null)
         try { ctx.getSystemService(LocationManager::class.java).removeUpdates(gps) } catch (e: Exception) {}
         liberarPantalla()
+        hiloLogos.shutdownNow()
         player.release()
         alCambiar = null
+    }
+}
+
+/** Barra de avance (películas) o de colchón (en vivo); en películas se toca para saltar. */
+class Barra(c: android.content.Context) : View(c) {
+    var avance = 0f
+        set(v) { field = v.coerceIn(0f, 1f); invalidate() }
+    var colorRelleno = Color.WHITE
+        set(v) { field = v; invalidate() }
+    var alTocar: ((Float) -> Unit)? = null
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    override fun onDraw(cv: Canvas) {
+        val mitad = height / 2f
+        val grueso = height * 0.24f
+        val r = height * 0.32f
+        val x0 = r; val x1 = width - r
+        p.color = 0x55FFFFFF
+        cv.drawRoundRect(x0, mitad - grueso / 2, x1, mitad + grueso / 2, grueso, grueso, p)
+        val xf = x0 + (x1 - x0) * avance
+        p.color = colorRelleno
+        cv.drawRoundRect(x0, mitad - grueso / 2, xf, mitad + grueso / 2, grueso, grueso, p)
+        p.color = Color.WHITE
+        cv.drawCircle(xf, mitad, r, p)
+    }
+
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        val f = alTocar ?: return false
+        if (e.action == MotionEvent.ACTION_UP) {
+            val r = height * 0.32f
+            f(((e.x - r) / (width - 2 * r)).coerceIn(0f, 1f))
+        }
+        return true
     }
 }
 
@@ -890,7 +1290,7 @@ class PantallaVideo(ctx: CarContext, private val tv: VideoCarro) : Screen(ctx) {
     override fun onGetTemplate(): Template {
         val pelis = tv.modo == Modo.PELICULAS
         val strip = ActionStrip.Builder()
-            .addAction(Action.Builder().setTitle(if (tv.panelVisible) "✕" else "☰ Canales").setOnClickListener {
+            .addAction(Action.Builder().setTitle(if (tv.panelVisible) "✕" else "☰ Menú").setOnClickListener {
                 if (tv.aceptaToques()) tv.alternarPanel() else tv.irA(PantallaMenu(carContext, tv))
             }.build())
             .addAction(icono(if (pelis) R.drawable.ic_atras else R.drawable.ic_anterior) { tv.anterior() })
