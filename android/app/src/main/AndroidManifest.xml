@@ -17,6 +17,10 @@
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
     <queries>
+        <!-- Búsqueda de canales por voz -->
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
         <package android:name="ec.jat.tv.video" />
         <package android:name="com.google.android.packageinstaller" />
         <package android:name="com.android.packageinstaller" />

@@ -97,6 +97,12 @@
       · Decodificador de respaldo (canales 1080p que daban "Decoder init failed").
       · Menos lag: favoritos y calidad en memoria (antes se preguntaba a TV JAT cada segundo); se quitó el retraso
         de 30 s que causaba "BEHIND_LIVE_WINDOW" (cortes y recargas).
+- [x] v1.18 (2026-11-25): 📱 El reproductor de canales del CELULAR funciona igual que el del carro: tocar el video
+      muestra/esconde la interfaz (lista a la derecha con número, logo y EN VIVO; botones redondos Guía · Anterior ·
+      Pausa · Siguiente · Cerrar; barra de información con ⭐, línea de tiempo, ● EN VIVO/Ir a EN VIVO, ⚙ Ajustes,
+      📶 Calidad); 🎤 Voz (reconocimiento de voz de Google, sin teclado); grabador (línea de tiempo hasta 10 min);
+      sin internet reintenta el mismo canal; decodificador de respaldo. Se conservan 📡 Ver en TV, ventana flotante
+      (PiP), control remoto (canal +/−, OK muestra la interfaz) y 🎬 Películas.
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
       permite); para esos, instalar TV JAT directo en la Android TV.
 - [ ] Mis Películas: subtítulos .srt con el mismo nombre del video.
@@ -171,3 +177,6 @@
   era mayor que lo que guardan muchos canales), saltos de canal en canal cuando no había internet, y "Decoder init
   failed" en canales 1080p. Jorge pide que sea lo más fácil de usar → v1.17. Respaldo: sin datos nuevos (lo grabado
   es temporal en la caché; "formaImagen" ya no se usa).
+- 2026-11-25: Jorge pide que la app del teléfono funcione igual a la del auto (aprobó la imagen) → v1.18: nuevo
+  PlayerActivity con la misma interfaz, voz, estrella, grabador y arreglos del carro. Respaldo: favoritos y calidad
+  ya van en respaldo_tv_jat.json; lo grabado es temporal (caché). Sin datos nuevos.
