@@ -30,6 +30,15 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.ImageView
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import androidx.media3.datasource.DataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
+import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.hls.playlist.DefaultHlsPlaylistTracker
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import android.os.ParcelFileDescriptor
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -174,7 +183,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             else -> "detenido"
         }
         return "Pantalla del carro: $dPantalla · Forma $dForma · Video: $dVideo · Estado: $est" +
-            " · Cuadros perdidos: $cuadrosPerdidos · Pausas por carga: $pausasCarga" +
+            " · Cuadros perdidos: $cuadrosPerdidos · Pausas por carga: $pausasCarga · Grabador: ${Grabador.info()}" +
             (if (dError.isNotEmpty()) " · Error: $dError" else "")
     }
 
@@ -185,35 +194,32 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     private var lentoDesde = 0L
     private var avisoFijo = ""
 
+    // canales por dirección (para saber qué canal pide el reproductor, aunque cambie solo)
+    @Volatile private var porUrl: Map<String, Canal> = emptyMap()
+    @Volatile private var calidadMem: String = "auto"
+
     init {
         val http = DefaultHttpDataSource.Factory()
             .setUserAgent(Reproduccion.USER_AGENT)
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(15000)
             .setReadTimeoutMs(20000)
-        val conCabeceras = ResolvingDataSource.Factory(http) { spec ->
-            val c = canalActual
-            val extra = HashMap<String, String>()
-            if (modo == Modo.CANALES && c != null) {
-                if (c.userAgent.isNotEmpty()) extra["User-Agent"] = c.userAgent
-                if (c.referer.isNotEmpty()) extra["Referer"] = c.referer
-            }
-            if (extra.isEmpty()) spec else spec.withAdditionalHeaders(extra)
-        }
-        player = ExoPlayer.Builder(ctx)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(ctx, conCabeceras)))
+        val conCabeceras = ResolvingDataSource.Factory(http) { spec -> resolverPedido(spec) }
+        Grabador.iniciar(ctx)
+        // si el chip de video del celular no puede abrir un canal, probar con otro decodificador
+        val renderizadores = DefaultRenderersFactory(ctx).setEnableDecoderFallback(true)
+        player = ExoPlayer.Builder(ctx, renderizadores)
+            .setMediaSourceFactory(FabricaFuentes(DefaultDataSource.Factory(ctx, conCabeceras)))
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
                 true
             )
             .setWakeMode(C.WAKE_MODE_NETWORK)
-            // Línea de tiempo: guarda hasta 2 min hacia adelante (si el internet baja, se gasta lo guardado)
-            // y 90 s ya vistos hacia atrás (para regresar sin volver a descargar). Si se queda sin colchón,
-            // espera a tener 8 s guardados antes de seguir (evita el "avanza-se detiene-avanza").
+            // Colchón en memoria (lo grabado está en el Grabador). Si se queda sin colchón,
+            // espera a tener 6 s antes de seguir (evita el "avanza-se detiene-avanza").
             .setLoadControl(DefaultLoadControl.Builder()
-                .setBufferDurationsMs(40_000, 120_000, 3_000, 8_000)
-                .setBackBuffer(90_000, true)
-                .setTargetBufferBytes(64 * 1024 * 1024)
+                .setBufferDurationsMs(30_000, 60_000, 2_500, 6_000)
+                .setTargetBufferBytes(48 * 1024 * 1024)
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build())
             .build()
@@ -293,6 +299,13 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                     player.replaceMediaItem(idx, actual.buildUpon().setMimeType(MimeTypes.APPLICATION_M3U8).build())
                     player.prepare(); player.play(); return
                 }
+                // sin internet: no es el canal; esperar y reintentar el MISMO canal
+                if (esDeRed(e) && !hayInternet()) {
+                    ponerAviso("📶 Sin internet.\nReintentando este canal…")
+                    main.removeCallbacks(reintento)
+                    main.postDelayed(reintento, 5000)
+                    return
+                }
                 // canal caído: pasa solo al siguiente (máximo 10 seguidos)
                 errorSeguidos++
                 if (player.hasNextMediaItem() && errorSeguidos <= 10) {
@@ -306,6 +319,47 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             }
         })
     }
+
+    /** Antes de cada descarga: canal grabado (línea de tiempo) o directo con sus cabeceras. */
+    private fun resolverPedido(spec: androidx.media3.datasource.DataSpec): androidx.media3.datasource.DataSpec {
+        // Línea de tiempo: si el reproductor pide la lista de un canal, se graba y se ve desde lo grabado
+        val pedido = if (modo == Modo.CANALES) porUrl[spec.uri.toString()] else null
+        if (pedido != null) {
+            val local = try { Grabador.direccion(pedido.url, pedido.userAgent, pedido.referer, maxAlto()) } catch (e: Exception) { null }
+            if (local != null) return spec.withUri(local)
+        }
+        val c = canalActual
+            val extra = HashMap<String, String>()
+            if (modo == Modo.CANALES && c != null) {
+                if (c.userAgent.isNotEmpty()) extra["User-Agent"] = c.userAgent
+                if (c.referer.isNotEmpty()) extra["Referer"] = c.referer
+            }
+        return if (extra.isEmpty()) spec else spec.withAdditionalHeaders(extra)
+    }
+
+    // ------------------------------------------------------------------ red
+    private fun esDeRed(e: PlaybackException) = e.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+        e.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
+        e.errorCode == PlaybackException.ERROR_CODE_TIMEOUT
+
+    private fun hayInternet(): Boolean = try {
+        val cm = ctx.getSystemService(ConnectivityManager::class.java)
+        val cap = cm.getNetworkCapabilities(cm.activeNetwork)
+        cap != null && cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    } catch (e: Exception) { true }
+
+    private val reintento: Runnable = object : Runnable {
+        override fun run() {
+            if (modo != Modo.CANALES) return
+            if (!hayInternet()) { ponerAviso("📶 Sin internet.\nReintentando este canal…"); main.postDelayed(this, 5000); return }
+            ponerAviso("Volvió el internet…")
+            errorSeguidos = 0
+            player.prepare(); player.play()
+        }
+    }
+
+    private fun maxAlto() = when (calidadMem) { "alta" -> 1080; "ahorro" -> 480; else -> 720 }
 
     /** Se llama cuando ya está todo listo (guardado del avance y GPS). */
     fun arrancar() {
@@ -333,10 +387,10 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     private fun itemCanal(c: Canal): MediaItem {
         val b = MediaItem.Builder().setMediaId(c.url).setUri(Uri.parse(c.url))
             .setMediaMetadata(MediaMetadata.Builder().setTitle(c.nombre).build())
-            // En vivo: ir 30 s atrás del "en directo" (esos 30 s ya existen y se bajan rápido = colchón), y a velocidad
+            // En vivo: velocidad normal siempre (acelerar/frenar para alcanzar el directo hace que la imagen dé saltitos), y a velocidad
             // normal siempre (acelerar/frenar para alcanzar el directo hace que la imagen dé saltitos)
             .setLiveConfiguration(MediaItem.LiveConfiguration.Builder()
-                .setTargetOffsetMs(30_000).setMinPlaybackSpeed(1f).setMaxPlaybackSpeed(1f).build())
+                .setMinPlaybackSpeed(1f).setMaxPlaybackSpeed(1f).build())
         val u = c.url.lowercase()
         when {
             u.contains("m3u8") -> b.setMimeType(MimeTypes.APPLICATION_M3U8)
@@ -351,7 +405,9 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         AutoService.pausarSiSuena()
         modo = Modo.CANALES
         canalesLista = lista
+        porUrl = lista.associateBy { it.url }
         canalActual = lista[inicio]
+        main.removeCallbacks(reintento)
         probadosHls.clear(); errorSeguidos = 0
         player.setMediaItems(lista.map { itemCanal(it) }, inicio, C.TIME_UNSET)
         player.prepare(); player.play()
@@ -383,6 +439,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         guardarAvance(true)
         AutoService.pausarSiSuena()
         modo = Modo.PELICULAS
+        Grabador.detener()
+        main.removeCallbacks(reintento)
         pelisLista = lista
         canalActual = null
         val items = lista.map {
@@ -443,8 +501,10 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         liberarPantalla()
         superficie = s; ancho = sc.width; alto = sc.height; dpiCarro = sc.dpi
         dPantalla = "${sc.width}x${sc.height}"
-        if (Datos.formaImagen(ctx) == "B") {
-            directa = true; dForma = "B (directa)"
+        // La forma la decide sola la app: normal (con la lista encima del video); si la imagen
+        // sale negra, pasa sola a la directa (ver revisarImagen)
+        if (formaDirectaSesion) {
+            directa = true; dForma = "directa (automática)"
         } else try {
             val dm = ctx.getSystemService(DisplayManager::class.java)
             val d = dm.createVirtualDisplay("TV JAT Video", sc.width, sc.height, sc.dpi, s, 0)
@@ -455,7 +515,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             p.show()
             pres = p
             directa = false
-            dForma = "A (ajustada)"
+            dForma = "normal"
+            main.removeCallbacks(revisarImagen); main.postDelayed(revisarImagen, 12_000)
         } catch (e: Exception) {
             // Plan B: el video va directo a la pantalla (puede verse algo estirado)
             liberarPantalla()
@@ -564,7 +625,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         infoNombre = null; infoSub = null; infoTiempo = null; infoVivo = null; infoCalidad = null; barra = null; estrella = null
         filasLogo.clear(); filaMarcada = null; filasAccion.clear(); cursor = -1
         panelVisible = false
-        main.removeCallbacks(refresco); main.removeCallbacks(ocultarSolo)
+        main.removeCallbacks(refresco); main.removeCallbacks(ocultarSolo); main.removeCallbacks(revisarImagen)
         superficie = null; directa = false
     }
 
@@ -642,16 +703,18 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     }
 
     // calidad máxima de la imagen (menos calidad = menos datos y menos cortes)
-    fun calidadTexto() = when (Datos.calidad(ctx)) { "alta" -> "1080p"; "ahorro" -> "480p"; else -> "720p" }
+    fun calidadTexto() = when (calidadMem) { "alta" -> "1080p"; "ahorro" -> "480p"; else -> "720p" }
 
     private fun aplicarCalidad() {
-        val (w, h) = when (Datos.calidad(ctx)) { "alta" -> 1920 to 1080; "ahorro" -> 854 to 480; else -> 1280 to 720 }
+        calidadMem = Datos.calidad(ctx)
+        val (w, h) = when (calidadMem) { "alta" -> 1920 to 1080; "ahorro" -> 854 to 480; else -> 1280 to 720 }
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setMaxVideoSize(w, h).build()
     }
 
     fun cambiarCalidad() {
-        val sig = when (Datos.calidad(ctx)) { "auto" -> "alta"; "alta" -> "ahorro"; else -> "auto" }
+        val sig = when (calidadMem) { "auto" -> "alta"; "alta" -> "ahorro"; else -> "auto" }
         Datos.setCalidad(ctx, sig)
+        calidadMem = sig
         aplicarCalidad()
         ponerAviso(""); actualizarCapa()
         if (panelVista == "opciones") pintarPanel()
@@ -891,7 +954,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             br?.guardado = player.bufferedPosition.toFloat() / dur
             br?.avance = pos.toFloat() / dur
             val atras = (dur - pos).coerceAtLeast(0)
-            infoTiempo?.text = "Viendo ${horaReloj(atras)} · guardado ${colchon / 1000} s"
+            infoTiempo?.text = "Viendo ${horaReloj(atras)} · grabado ${hms(dur)}"
             val lejos = atras > 50_000
             infoVivo?.text = if (lejos) "● Ir a EN VIVO" else "● EN VIVO"
             infoVivo?.visibility = View.VISIBLE
@@ -919,7 +982,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             if (cAct == null) est.visibility = View.GONE
             else {
                 est.visibility = View.VISIBLE
-                val fav = cAct.url in Datos.favoritos(ctx)
+                val fav = cAct.url in favoritos()
                 est.text = if (fav) "★" else "☆"
                 est.setTextColor(if (fav) 0xFF3A2A00.toInt() else GRIS)
                 est.background = if (fav) redondo(0xFFF5B301.toInt()) else GradientDrawable().apply {
@@ -1045,12 +1108,13 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         ll.removeAllViews()
         filasLogo.clear(); filaMarcada = null
         filasAccion.clear(); cursor = -1
+        favMem = null
         panelScroll?.scrollTo(0, 0)
         when (panelVista) {
             "grupos" -> {
                 panelTitulo?.text = "☰ Guía · elige un grupo"
                 val todos = canales()
-                val fav = Datos.favoritos(ctx)
+                val fav = favoritos()
                 fila("★ Favoritos", "${todos.count { it.url in fav }} canales", grupoSel == "★") { grupoSel = "★"; panelVista = "canales"; pintarPanel() }
                 fila("📺 Todos", "${todos.size} canales", grupoSel == null) { grupoSel = null; panelVista = "canales"; pintarPanel() }
                 fila("🎬 Mis Películas", "Videos del celular") { panelVista = "pelis"; pintarPanel() }
@@ -1089,7 +1153,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 panelTitulo?.text = if (vozTexto.isEmpty()) "🎤 Búsqueda por voz" else "🎤 «$vozTexto»"
                 fila("🎤 Hablar otra vez") { buscarPorVoz() }
                 val todos = canales()
-                val fav = Datos.favoritos(ctx)
+                val fav = favoritos()
                 vozResultados.forEachIndexed { n, c ->
                     filaCanal(n + 1, c, false, c.url in fav) {
                         grupoSel = null
@@ -1106,14 +1170,12 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 val entera = Datos.ajusteImagen(ctx) == "entera"
                 fila(if (entera) "🖼️ Imagen: ENTERA" else "🖼️ Imagen: COMPLETA",
                     if (entera) "Se ve todo, con franjas negras" else "Llena la pantalla (recorta bordes)") { cambiarAjuste() }
-                fila("📶 Calidad: ${calidadTexto()}", when (Datos.calidad(ctx)) {
+                fila("📶 Calidad: ${calidadTexto()}", when (calidadMem) {
                     "alta" -> "Mejor imagen, gasta más datos"; "ahorro" -> "Menos datos y menos cortes"; else -> "Normal (como la pantalla del carro)"
                 }) { cambiarCalidad() }
                 val pasajero = Datos.modoPasajero(ctx)
                 fila(if (pasajero) "👥 Modo pasajero: ACTIVADO" else "👥 Modo pasajero: desactivado",
                     if (pasajero) "La imagen se ve con el carro en marcha" else "La imagen se tapa al avanzar") { cambiarModoPasajero(); pintarPanel() }
-                fila(if (Datos.formaImagen(ctx) == "B") "🔧 Forma: B (directa)" else "🔧 Forma: A (normal)",
-                    "Solo si no se ve la imagen") { cambiarFormaImagen() }
                 fila("📋 Menú completo") { ocultarPanel(); irA(PantallaMenu(ctx, this)) }
                 fila("🔧 Diagnóstico", diagnostico()) {}
             }
@@ -1121,11 +1183,11 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 val todos = canales()
                 val lista = when (grupoSel) {
                     null -> todos
-                    "★" -> Datos.favoritos(ctx).let { f -> todos.filter { it.url in f } }
+                    "★" -> favoritos().let { f -> todos.filter { it.url in f } }
                     else -> todos.filter { grupoDe(it) == grupoSel }
                 }
                 panelTitulo?.text = "📂 " + when (grupoSel) { null -> "Todos"; "★" -> "★ Favoritos"; else -> grupoSel } + "  ▾ cambiar"
-                val fav = Datos.favoritos(ctx)
+                val fav = favoritos()
                 val actual = if (modo == Modo.CANALES) canalActual?.url else null
                 lista.take(500).forEachIndexed { i, c ->
                     filaCanal(i + 1, c, c.url == actual, c.url in fav) { ponerCanales(lista, i); pintarPanel() }
@@ -1182,17 +1244,21 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     // ------------------------------------------------------------------ favorito con la estrella
     private var estrella: TextView? = null
+    private var favMem: Set<String>? = null
+    /** Favoritos guardados en memoria (no se pregunta a TV JAT cada segundo: eso trababa la imagen). */
+    private fun favoritos(): Set<String> = favMem ?: Datos.favoritos(ctx).also { favMem = it }
 
     fun esFavoritoActual(): Boolean {
         if (modo != Modo.CANALES) return false
         val c = canalesLista.getOrNull(player.currentMediaItemIndex) ?: return false
-        return c.url in Datos.favoritos(ctx)
+        return c.url in favoritos()
     }
 
     fun cambiarFavoritoActual() {
         if (modo != Modo.CANALES) return
         val c = canalesLista.getOrNull(player.currentMediaItemIndex) ?: return
         val ahora = Datos.cambiarFavorito(ctx, c.url)
+        favMem = null
         avisoBreve(if (ahora) "★ ${c.nombre} agregado a Favoritos" else "☆ ${c.nombre} quitado de Favoritos")
         actualizarCapa()
         alCambiar?.invoke()
@@ -1550,12 +1616,37 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         if (!nuevo) iniciarGps() else aplicarMovimiento()
     }
 
-    /** Cambia entre la forma A (ajustada) y B (directa) de mostrar la imagen. */
-    fun cambiarFormaImagen() {
-        Datos.setFormaImagen(ctx, if (Datos.formaImagen(ctx) == "B") "A" else "B")
-        val s = superficie ?: return
-        val sc = SurfaceContainer(s, ancho, alto, dpiCarro)
-        onSurfaceAvailable(sc)
+    /** Forma de imagen automática: si en la forma normal la imagen sale negra, se pasa a la directa. */
+    private var formaDirectaSesion = false
+    private var revisionesNegras = 0
+    private val revisarImagen: Runnable = object : Runnable {
+        override fun run() {
+            val tx = textura ?: return
+            if (directa || formaDirectaSesion) return
+            // solo se puede revisar si el video está corriendo y la imagen no está tapada
+            if (!player.isPlaying || player.videoSize.width <= 0 || vista?.visibility != View.VISIBLE) {
+                main.postDelayed(this, 5000); return
+            }
+            val negra = try {
+                val b = tx.getBitmap(32, 18)
+                if (b == null) true else {
+                    var max = 0
+                    for (x in 0 until b.width) for (y in 0 until b.height) {
+                        val px = b.getPixel(x, y)
+                        max = maxOf(max, Color.red(px) + Color.green(px) + Color.blue(px))
+                    }
+                    b.recycle()
+                    max < 30
+                }
+            } catch (e: Exception) { false }
+            if (!negra) { revisionesNegras = 0; return }      // se ve: listo
+            revisionesNegras++
+            if (revisionesNegras < 3) { main.postDelayed(this, 4000); return }
+            Registro.anotar(ctx, "   🖼️ la imagen sale negra en la forma normal: paso sola a la forma directa")
+            formaDirectaSesion = true
+            val s = superficie ?: return
+            onSurfaceAvailable(SurfaceContainer(s, ancho, alto, dpiCarro))
+        }
     }
 
     fun liberar() {
@@ -1564,10 +1655,31 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         try { ctx.getSystemService(LocationManager::class.java).removeUpdates(gps) } catch (e: Exception) {}
         detenerVoz()
         liberarPantalla()
+        Grabador.cerrar()
         hiloLogos.shutdownNow()
         player.release()
         alCambiar = null
     }
+}
+
+/**
+ * Igual que la fábrica normal, pero para canales HLS espera mucho más antes de dar el canal por "trabado"
+ * cuando no llegan partes nuevas (sin internet sigue con lo grabado en vez de cortarse a los pocos segundos).
+ */
+class FabricaFuentes(ds: DataSource.Factory) : MediaSource.Factory {
+    private val normal = DefaultMediaSourceFactory(ds)
+    private val hls = HlsMediaSource.Factory(ds).setPlaylistTrackerFactory { a, b, c -> DefaultHlsPlaylistTracker(a, b, c, 40.0) }
+
+    override fun setDrmSessionManagerProvider(p: DrmSessionManagerProvider): MediaSource.Factory {
+        normal.setDrmSessionManagerProvider(p); hls.setDrmSessionManagerProvider(p); return this
+    }
+    override fun setLoadErrorHandlingPolicy(p: LoadErrorHandlingPolicy): MediaSource.Factory {
+        normal.setLoadErrorHandlingPolicy(p); hls.setLoadErrorHandlingPolicy(p); return this
+    }
+    override fun getSupportedTypes(): IntArray = normal.supportedTypes
+    override fun createMediaSource(mediaItem: MediaItem): MediaSource =
+        if (mediaItem.localConfiguration?.mimeType == MimeTypes.APPLICATION_M3U8) hls.createMediaSource(mediaItem)
+        else normal.createMediaSource(mediaItem)
 }
 
 /** Barra de avance (películas) o de colchón (en vivo); en películas se toca para saltar. */
@@ -1717,11 +1829,6 @@ class PantallaMenu(ctx: CarContext, tv: VideoCarro) : PantallaFilas(ctx, "TV JAT
         if (pasajero) "La imagen se ve con el carro en marcha. Toca para taparla al avanzar"
         else "La imagen se tapa al avanzar. Toca para verla siempre"
     ) { tv.cambiarModoPasajero(); tv.volverAlVideo() })
-    val forma = Datos.formaImagen(ctx)
-    l.add(Fila(
-        if (forma == "B") "🖼️ Forma de imagen: B (directa)" else "🖼️ Forma de imagen: A (ajustada)",
-        "Si no se ve la imagen, toca para probar la otra forma"
-    ) { tv.cambiarFormaImagen(); tv.volverAlVideo() })
     l.add(Fila("🔧 Diagnóstico", tv.diagnostico()) { tv.volverAlVideo() })
     l
 })

@@ -85,6 +85,18 @@
         (colchón); espera 8 s guardados antes de seguir si se corta. Barra: azul = guardado, punto blanco = lo que
         ves, hora que estás viendo; se toca para regresar y "● Ir a EN VIVO" vuelve al directo.
       · ⭐ Estrella junto al nombre del canal (y en los botones del carro): agrega/quita de Favoritos sin salir.
+- [x] v1.17 (2026-11-25): 🚗 TV JAT Video más fácil y fluido:
+      · 📼 GRABADOR (línea de tiempo de verdad): mientras ves un canal HLS en vivo, TV JAT lo va bajando y guardando en
+        el celular (hasta 10 min, carpeta temporal que se borra al cambiar de canal). El video se ve desde lo grabado
+        (servidor solo dentro del celular): si el internet baja, sigue con lo grabado; la barra deja regresar y
+        "● Ir a EN VIVO" vuelve; en pausa sigue grabando. Elige la calidad ≤ la de 📶 Calidad. Si el canal no se
+        puede grabar (no es HLS, tiene fin o trae el audio aparte) se ve directo como antes.
+      · Se quitó la elección "Forma A/B": siempre forma normal (con lista encima); si la imagen sale negra la app
+        pasa sola a la directa.
+      · Sin internet: ya no salta de canal en canal; avisa "📶 Sin internet" y reintenta el MISMO canal cada 5 s.
+      · Decodificador de respaldo (canales 1080p que daban "Decoder init failed").
+      · Menos lag: favoritos y calidad en memoria (antes se preguntaba a TV JAT cada segundo); se quitó el retraso
+        de 30 s que causaba "BEHIND_LIVE_WINDOW" (cortes y recargas).
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
       permite); para esos, instalar TV JAT directo en la Android TV.
 - [ ] Mis Películas: subtítulos .srt con el mismo nombre del video.
@@ -154,3 +166,8 @@
   favorito desde el video. Aprobó las imágenes de cómo quedaría → v1.16. Respaldo: los favoritos marcados con la
   estrella se guardan en TV JAT (misma lista "favoritos" de respaldo_tv_jat.json); el colchón/línea de tiempo y la
   voz no guardan datos (son temporales). Permiso nuevo en TV JAT Video: micrófono.
+- 2026-11-25: Jorge prueba v1.16: "no funciona, se laguea, no hay línea de tiempo". Diagnóstico: estaba en Forma B
+  (directa, sin lista ni barra encima del video), errores BEHIND_LIVE_WINDOW repetidos (el retraso de 30 s que puse
+  era mayor que lo que guardan muchos canales), saltos de canal en canal cuando no había internet, y "Decoder init
+  failed" en canales 1080p. Jorge pide que sea lo más fácil de usar → v1.17. Respaldo: sin datos nuevos (lo grabado
+  es temporal en la caché; "formaImagen" ya no se usa).
