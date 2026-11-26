@@ -37,6 +37,12 @@
             android:value="1" />
 
         <!-- Canales y películas CON IMAGEN en la pantalla del carro (como Fermata Auto) -->
+        <!-- Permisos (micrófono, ubicación, videos) desde el celular: TV JAT → ⋮ → Activar micrófono del carro -->
+        <activity
+            android:name=".PermisosActivity"
+            android:exported="true"
+            android:label="Permisos de TV JAT Video" />
+
         <service
             android:name="ec.jat.tv.AutoVideoService"
             android:exported="true"

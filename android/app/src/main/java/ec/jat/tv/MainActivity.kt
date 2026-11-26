@@ -351,6 +351,7 @@ class MainActivity : Activity() {
     private fun menuMas(ancla: View) {
         val menu = PopupMenu(this, ancla)
         menu.menu.add(0, 8, 0, "🚗 Poner TV JAT Video en el carro")
+        menu.menu.add(0, 9, 0, "🎤 Activar micrófono del carro")
         menu.menu.add(0, 5, 0, "🩺 Revisar qué canales funcionan")
         menu.menu.add(0, 6, 0, if (Datos.ocultarCaidos(this)) "👁 Mostrar también los que no funcionan"
                                else "🙈 Ocultar los que no funcionan")
@@ -377,6 +378,16 @@ class MainActivity : Activity() {
                 }, PEDIR_IMPORTAR)
                 5 -> revisarCanales()
                 7 -> verDiagnostico()
+                9 -> try {
+                    startActivity(Intent().setClassName("ec.jat.tv.video", "ec.jat.tv.PermisosActivity"))
+                } catch (e: Exception) {
+                    // TV JAT Video viejo (sin esta pantalla): abrir sus ajustes para dar el permiso a mano
+                    try {
+                        startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.parse("package:ec.jat.tv.video")))
+                        aviso("En Permisos → Micrófono → Permitir")
+                    } catch (e2: Exception) { aviso("Primero instala TV JAT Video: ⋮ → Poner TV JAT Video en el carro") }
+                }
                 8 -> {
                     val e = InstaladorVideo.estado(this)
                     if (e.lista) AlertDialog.Builder(this).setTitle("🚗 TV JAT Video")

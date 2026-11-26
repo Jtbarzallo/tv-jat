@@ -107,6 +107,10 @@
       a la pantalla del carro (sin pantalla intermedia, que perdía cuadros); al tocar se pasa a la pantalla intermedia
       para mostrar la lista y, 1,5 s después de esconderse, vuelve a directo. El diagnóstico anota cada minuto los
       cuadros perdidos, el tamaño del video y la forma (directo / con lista).
+- [x] v1.20 (2026-11-26): 🎤 Voz en el carro no funcionaba porque TV JAT Video no tenía permiso del micrófono (la ventana
+      que lo pide en el celular se perdía). Nuevo: TV JAT → ⋮ → "🎤 Activar micrófono del carro" abre una pantalla de
+      TV JAT Video que pide micrófono, ubicación y videos de una vez (con botón a los ajustes si no pregunta). En el carro,
+      si falta el permiso, el aviso dice exactamente dónde activarlo.
 - [ ] Grabador: grabar también los canales que traen el audio aparte (hoy se ven directo, sin línea de tiempo).
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
       permite); para esos, instalar TV JAT directo en la Android TV.
@@ -190,3 +194,5 @@
   (Presentation/TextureView) que pierde cuadros → v1.19 salida directa cuando no hay nada encima. Los correos de
   "Run failed" eran: tv-jat 62ff028 (ya corregido en 08194f4) y JAT Control Suite PC 46b3a95 (versión vieja re-ejecutada;
   las nuevas compilan bien). Respaldo: sin datos nuevos.
+- 2026-11-26: Jorge: "el botón de audio no funciona, dice algo como activar micrófono" → faltaba el permiso RECORD_AUDIO
+  de TV JAT Video → v1.20 pantalla de permisos desde TV JAT. Respaldo: sin datos nuevos (los permisos los guarda Android).

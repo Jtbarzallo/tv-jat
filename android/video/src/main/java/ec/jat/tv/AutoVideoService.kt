@@ -1320,7 +1320,9 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     /** Botón 🎤 Voz: escucha el nombre del canal y lo pone (o muestra los parecidos). */
     fun buscarPorVoz() {
         if (ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            avisoBreve("🎤 Acepta en el celular el permiso del micrófono")
+            Registro.anotar(ctx, "   🎤 falta el permiso del micrófono")
+            ponerAviso("🎤 Falta activar el micrófono.\nEn el celular: TV JAT → ⋮ →\n🎤 Activar micrófono del carro")
+            main.removeCallbacks(quitarAvisoBreve); main.postDelayed(quitarAvisoBreve, 8000)
             try {
                 ctx.requestPermissions(listOf(Manifest.permission.RECORD_AUDIO)) { ok, _ ->
                     if (ok.contains(Manifest.permission.RECORD_AUDIO)) buscarPorVoz()
