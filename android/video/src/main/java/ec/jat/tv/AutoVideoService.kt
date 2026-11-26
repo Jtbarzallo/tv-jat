@@ -166,9 +166,23 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     private var titulo: TextView? = null
     private var aviso: TextView? = null
     private var directa = false     // si no se pudo armar la pantalla, el video va directo
+    /** Forma normal, pero sin nada encima: el video va directo a la pantalla del carro (fluido). */
+    private var salidaDirecta = false
 
     // diagnóstico (se ve en Menú → Diagnóstico)
     private var cuadrosPerdidos = 0L
+    private var perdidosMinuto = 0L
+    /** Cada minuto anota en el diagnóstico los cuadros perdidos (para saber si el video va fluido). */
+    private val anotarCuadros: Runnable = object : Runnable {
+        override fun run() {
+            if (player.isPlaying && superficie != null) {
+                val forma = when { directa -> "directa"; salidaDirecta -> "directo (sin lista)"; else -> "con lista encima" }
+                Registro.anotar(ctx, "   🎞 último minuto: $perdidosMinuto cuadros perdidos · ${player.videoSize.width}x${player.videoSize.height} · $forma")
+            }
+            perdidosMinuto = 0
+            main.postDelayed(this, 60_000)
+        }
+    }
     private var pausasCarga = 0
     private var yaArranco = false
     private var dPantalla = "todavía no llega"
@@ -206,6 +220,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             .setReadTimeoutMs(20000)
         val conCabeceras = ResolvingDataSource.Factory(http) { spec -> resolverPedido(spec) }
         Grabador.iniciar(ctx)
+        main.postDelayed(anotarCuadros, 60_000)
         // si el chip de video del celular no puede abrir un canal, probar con otro decodificador
         val renderizadores = DefaultRenderersFactory(ctx).setEnableDecoderFallback(true)
         player = ExoPlayer.Builder(ctx, renderizadores)
@@ -228,6 +243,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         player.addAnalyticsListener(object : AnalyticsListener {
             override fun onDroppedVideoFrames(et: AnalyticsListener.EventTime, droppedFrames: Int, elapsedMs: Long) {
                 cuadrosPerdidos += droppedFrames
+                perdidosMinuto += droppedFrames
             }
         })
 
@@ -618,7 +634,9 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         textura = null
         try { pres?.dismiss() } catch (e: Exception) {}
         try { vd?.release() } catch (e: Exception) {}
-        if (directa) player.clearVideoSurface()
+        if (directa || salidaDirecta) player.clearVideoSurface()
+        salidaDirecta = false
+        main.removeCallbacks(aDirecto)
         pres = null; vd = null; vista = null; titulo = null; aviso = null
         capa = null; panel = null; panelLista = null; panelScroll = null; panelTitulo = null; raizVista = null
         chipCanales = null; chipPelis = null; btnPausa = null; btnAnt = null; btnSig = null; lblAnt = null; lblSig = null
@@ -633,7 +651,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     private fun mostrarTitulo(texto: String) {
         val t = titulo ?: return
-        if (panelVisible) return       // la barra de abajo ya dice el nombre
+        if (panelVisible || salidaDirecta) return       // la barra de abajo ya dice el nombre
         t.text = texto
         t.visibility = View.VISIBLE
         main.removeCallbacks(ocultarTitulo)
@@ -652,6 +670,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val txt = avisoFijo.ifEmpty { avisoTemporal }
         a.text = txt
         a.visibility = if (txt.isEmpty()) View.GONE else View.VISIBLE
+        revisarSalida()
     }
 
     // ------------------------------------------------------------------ interfaz sobre el video
@@ -1405,6 +1424,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         reconocedor = null
         if (escuchando) { player.volume = volumenAntes; ponerAviso("") }
         escuchando = false
+        revisarSalida()
     }
 
     private val palabrasDeMas = setOf("pon", "ponme", "poner", "pone", "quiero", "ver", "canal", "el", "la", "en", "de", "por", "favor", "abre", "abrir")
@@ -1488,6 +1508,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         cp.visibility = View.VISIBLE
         tocado()
         main.removeCallbacks(refresco); main.post(refresco)
+        revisarSalida()
         alCambiar?.invoke()
     }
 
@@ -1496,7 +1517,48 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         panelVisible = false
         usaCursor = false
         main.removeCallbacks(ocultarSolo); main.removeCallbacks(refresco)
+        revisarSalida()
         alCambiar?.invoke()
+    }
+
+    // ------------------------------------------------------------------ video fluido
+    // Dibujar el video dentro de la "pantalla intermedia" (para poner la lista encima) hace que se pierdan
+    // cuadros. Por eso: si no hay nada encima, el video va DIRECTO a la pantalla del carro (fluido);
+    // al tocar (lista, avisos, voz) se pasa a la pantalla intermedia, y al esconderse vuelve a directo.
+    private fun hayAlgoEncima(): Boolean =
+        panelVisible || escuchando || avisoFijo.isNotEmpty() || avisoTemporal.isNotEmpty()
+
+    private val aDirecto = Runnable { usarDirecto() }
+
+    private fun revisarSalida() {
+        if (vd == null || directa) return
+        if (hayAlgoEncima()) { main.removeCallbacks(aDirecto); usarPresentacion() }
+        else { main.removeCallbacks(aDirecto); main.postDelayed(aDirecto, 1500) }   // espera un poco: evita saltos
+    }
+
+    private fun usarDirecto() {
+        val d = vd ?: return
+        val s = superficie ?: return
+        if (salidaDirecta || directa || hayAlgoEncima()) return
+        try {
+            d.surface = null                 // la pantalla intermedia suelta la pantalla del carro…
+            player.setVideoSurface(s)        // …y el video va directo
+            salidaDirecta = true
+        } catch (e: Exception) {
+            Registro.anotar(ctx, "   🖼️ no se pudo pasar a directo: ${e.javaClass.simpleName}")
+        }
+    }
+
+    private fun usarPresentacion() {
+        val d = vd ?: return
+        val s = superficie ?: return
+        val tx = textura ?: return
+        if (!salidaDirecta) return
+        salidaDirecta = false
+        player.setVideoTextureView(tx)       // el video vuelve a la pantalla intermedia…
+        main.postDelayed({                   // …y cuando el video ya soltó la pantalla, se conecta
+            if (!salidaDirecta && vd === d && superficie === s) try { d.surface = s } catch (e: Exception) {}
+        }, 200)
     }
 
     fun alternarPanel() { if (panelVisible) ocultarPanel() else mostrarPanel() }
@@ -1623,6 +1685,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         override fun run() {
             val tx = textura ?: return
             if (directa || formaDirectaSesion) return
+            if (salidaDirecta) { main.postDelayed(this, 5000); return }
             // solo se puede revisar si el video está corriendo y la imagen no está tapada
             if (!player.isPlaying || player.videoSize.width <= 0 || vista?.visibility != View.VISIBLE) {
                 main.postDelayed(this, 5000); return
@@ -1654,6 +1717,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         main.removeCallbacksAndMessages(null)
         try { ctx.getSystemService(LocationManager::class.java).removeUpdates(gps) } catch (e: Exception) {}
         detenerVoz()
+        main.removeCallbacks(anotarCuadros)
         liberarPantalla()
         Grabador.cerrar()
         hiloLogos.shutdownNow()

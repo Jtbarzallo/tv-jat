@@ -103,6 +103,11 @@
       📶 Calidad); 🎤 Voz (reconocimiento de voz de Google, sin teclado); grabador (línea de tiempo hasta 10 min);
       sin internet reintenta el mismo canal; decodificador de respaldo. Se conservan 📡 Ver en TV, ventana flotante
       (PiP), control remoto (canal +/−, OK muestra la interfaz) y 🎬 Películas.
+- [x] v1.19 (2026-11-26): 🚗 Video fluido en el carro: si no hay nada encima (lista, avisos, voz), el video va DIRECTO
+      a la pantalla del carro (sin pantalla intermedia, que perdía cuadros); al tocar se pasa a la pantalla intermedia
+      para mostrar la lista y, 1,5 s después de esconderse, vuelve a directo. El diagnóstico anota cada minuto los
+      cuadros perdidos, el tamaño del video y la forma (directo / con lista).
+- [ ] Grabador: grabar también los canales que traen el audio aparte (hoy se ven directo, sin línea de tiempo).
 - [ ] Ver en TV: canales que piden User-Agent/Referer especial no abren en la TV (Google Cast no lo
       permite); para esos, instalar TV JAT directo en la Android TV.
 - [ ] Mis Películas: subtítulos .srt con el mismo nombre del video.
@@ -180,3 +185,8 @@
 - 2026-11-25: Jorge pide que la app del teléfono funcione igual a la del auto (aprobó la imagen) → v1.18: nuevo
   PlayerActivity con la misma interfaz, voz, estrella, grabador y arreglos del carro. Respaldo: favoritos y calidad
   ya van en respaldo_tv_jat.json; lo grabado es temporal (caché). Sin datos nuevos.
+- 2026-11-26: Jorge: "funciona mejor, pero el video no es fluido". Diagnóstico: el grabador funciona (Golden, Ecuavisa
+  grabados sin una sola pausa por carga) → no es el internet; es el dibujo del video en la pantalla intermedia
+  (Presentation/TextureView) que pierde cuadros → v1.19 salida directa cuando no hay nada encima. Los correos de
+  "Run failed" eran: tv-jat 62ff028 (ya corregido en 08194f4) y JAT Control Suite PC 46b3a95 (versión vieja re-ejecutada;
+  las nuevas compilan bien). Respaldo: sin datos nuevos.
