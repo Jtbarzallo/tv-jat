@@ -250,6 +250,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 yaArranco = false
+                reintentoPantalla = false
                 if (panelVisible) pintarPanel()
                 val i = player.currentMediaItemIndex
                 if (modo == Modo.CANALES) {
@@ -307,6 +308,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 if (e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
                     player.seekToDefaultPosition(); player.prepare(); return
                 }
+                // error del cambio de pantalla (no del canal): reintentar el mismo canal, sin saltar
+                if (arreglarErrorDePantalla(e)) return
                 if (modo == Modo.PELICULAS) {
                     ponerAviso("No se pudo abrir este video"); return
                 }
@@ -1532,8 +1535,14 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     private val aDirecto = Runnable { usarDirecto() }
 
+    /** Si el paso a directo hizo fallar el video una vez, en esta sesión el video se queda en la forma normal. */
+    private var directoFallo = false
+    /** Hora del último cambio de pantalla (para saber si un error vino de ese cambio). */
+    private var ultimoCambio = 0L
+
     private fun revisarSalida() {
         if (vd == null || directa) return
+        if (directoFallo) { main.removeCallbacks(aDirecto); usarPresentacion(); return }
         if (hayAlgoEncima()) { main.removeCallbacks(aDirecto); usarPresentacion() }
         else { main.removeCallbacks(aDirecto); main.postDelayed(aDirecto, 1500) }   // espera un poco: evita saltos
     }
@@ -1541,14 +1550,25 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     private fun usarDirecto() {
         val d = vd ?: return
         val s = superficie ?: return
-        if (salidaDirecta || directa || hayAlgoEncima()) return
-        try {
-            d.surface = null                 // la pantalla intermedia suelta la pantalla del carro…
-            player.setVideoSurface(s)        // …y el video va directo
-            salidaDirecta = true
-        } catch (e: Exception) {
-            Registro.anotar(ctx, "   🖼️ no se pudo pasar a directo: ${e.javaClass.simpleName}")
+        if (salidaDirecta || directa || directoFallo || hayAlgoEncima()) return
+        if (player.playbackState != Player.STATE_READY) {           // en plena carga no se cambia de pantalla
+            main.postDelayed(aDirecto, 1500); return
         }
+        salidaDirecta = true
+        ultimoCambio = System.currentTimeMillis()
+        try { d.surface = null } catch (e: Exception) {}              // la pantalla intermedia suelta la del carro…
+        // …y el video se conecta solo cuando el carro ya la soltó de verdad (v1.19 lo hacía al instante y
+        // el video fallaba con "Unexpected runtime error" a los 2 segundos de cada canal)
+        main.postDelayed({
+            if (salidaDirecta && vd === d && superficie === s) try {
+                player.setVideoSurface(s)
+                ultimoCambio = System.currentTimeMillis()
+            } catch (e: Exception) {
+                Registro.anotar(ctx, "   🖼️ no se pudo pasar a directo: ${e.javaClass.simpleName}")
+                directoFallo = true
+                usarPresentacion()
+            }
+        }, 400)
     }
 
     private fun usarPresentacion() {
@@ -1557,11 +1577,35 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val tx = textura ?: return
         if (!salidaDirecta) return
         salidaDirecta = false
+        ultimoCambio = System.currentTimeMillis()
         player.setVideoTextureView(tx)       // el video vuelve a la pantalla intermedia…
         main.postDelayed({                   // …y cuando el video ya soltó la pantalla, se conecta
             if (!salidaDirecta && vd === d && superficie === s) try { d.surface = s } catch (e: Exception) {}
-        }, 200)
+        }, 400)
     }
+
+    /**
+     * El error "Unexpected runtime error" (FAILED_RUNTIME_CHECK) no es culpa del canal: viene del cambio de pantalla.
+     * Se vuelve a la forma normal (con lista encima), se deja de pasar a directo en esta sesión y se reintenta
+     * el MISMO canal (antes saltaba de canal en canal).
+     */
+    private fun arreglarErrorDePantalla(e: PlaybackException): Boolean {
+        if (e.errorCode != PlaybackException.ERROR_CODE_FAILED_RUNTIME_CHECK) return false
+        val porCambio = salidaDirecta || System.currentTimeMillis() - ultimoCambio < 10_000
+        if (!porCambio && reintentoPantalla) return false
+        if (porCambio && !directoFallo) {
+            directoFallo = true
+            Registro.anotar(ctx, "   🖼️ el paso a directo falló: el video se queda con la forma normal")
+        }
+        reintentoPantalla = true
+        main.removeCallbacks(aDirecto)
+        if (salidaDirecta) {
+            usarPresentacion()
+            main.postDelayed({ player.prepare(); player.play() }, 600)
+        } else { player.prepare(); player.play() }
+        return true
+    }
+    private var reintentoPantalla = false
 
     fun alternarPanel() { if (panelVisible) ocultarPanel() else mostrarPanel() }
 

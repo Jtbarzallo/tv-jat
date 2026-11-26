@@ -196,3 +196,10 @@
   las nuevas compilan bien). Respaldo: sin datos nuevos.
 - 2026-11-26: Jorge: "el botón de audio no funciona, dice algo como activar micrófono" → faltaba el permiso RECORD_AUDIO
   de TV JAT Video → v1.20 pantalla de permisos desde TV JAT. Respaldo: sin datos nuevos (los permisos los guarda Android).
+- 2026-11-26: Jorge manda el diagnóstico de TV JAT 1.0.23. Desde v1.19, en el carro cada canal grabado arrancaba y a los
+  ~2 s fallaba con "ERROR_CODE_FAILED_RUNTIME_CHECK · Unexpected runtime error", y la app saltaba sola de canal en canal
+  (Maimon, Majestad, Makao, Maray…). Causa: el paso a "salida directa" conectaba el video a la pantalla del carro en el
+  mismo instante en que la pantalla intermedia la soltaba (todavía ocupada) → v1.21: espera a que el carro la suelte,
+  no cambia de pantalla mientras el canal carga, y si aun así falla vuelve sola a la forma normal (con la lista
+  encima) por el resto de la sesión y reintenta el MISMO canal en vez de saltar. Dato del registro: con la lista
+  encima marcó "0 cuadros perdidos". Respaldo: sin datos nuevos.
