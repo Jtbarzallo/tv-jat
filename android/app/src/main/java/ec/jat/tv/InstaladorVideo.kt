@@ -23,52 +23,42 @@ import java.net.URL
  * Aquí se le pide al instalador del sistema que la registre como instalada por Google Play
  * (el mismo método "clásico" que usa KingInstaller, el instalador que recomienda Fermata Auto).
  */
-object InstaladorVideo {
-    const val PAQUETE = "ec.jat.tv.video"
-    const val PLAY = "com.android.vending"
-    const val URL_APK = "https://github.com/Jtbarzallo/tv-jat/releases/latest/download/TVJAT-Video.apk"
-    const val AUTORIDAD = "ec.jat.tv.apk"
-    val URI_APK: Uri = Uri.parse("content://$AUTORIDAD/TVJAT-Video.apk")
+/** Una app del carro que JTV instala "como de Google Play" (JTV Video, JTV YouTube). */
+class AppCarro(val paquete: String, val archivoApk: String, val nombre: String) {
+    val urlApk: String get() = "https://github.com/Jtbarzallo/tv-jat/releases/latest/download/$archivoApk"
+    val uriApk: Uri get() = Uri.parse("content://${InstaladorVideo.AUTORIDAD}/$archivoApk")
 
     class Estado(val instalada: Boolean, val instaladoPor: String?, val pedidoPor: String?) {
         /** true = Android Auto la va a mostrar */
-        val lista: Boolean get() = instalada && instaladoPor == PLAY && pedidoPor != "com.android.shell"
+        val lista: Boolean get() = instalada && instaladoPor == InstaladorVideo.PLAY && pedidoPor != "com.android.shell"
     }
 
-    fun archivo(ctx: Context) = File(File(ctx.cacheDir, "apk").apply { mkdirs() }, "TVJAT-Video.apk")
+    fun archivo(ctx: Context) = File(File(ctx.cacheDir, "apk").apply { mkdirs() }, archivoApk)
 
     @Suppress("DEPRECATION")
     fun estado(ctx: Context): Estado {
         val pm = ctx.packageManager
         return try {
-            pm.getPackageInfo(PAQUETE, 0)
+            pm.getPackageInfo(paquete, 0)
             if (Build.VERSION.SDK_INT >= 30) {
-                val i = pm.getInstallSourceInfo(PAQUETE)
+                val i = pm.getInstallSourceInfo(paquete)
                 Estado(true, i.installingPackageName, i.initiatingPackageName)
-            } else Estado(true, pm.getInstallerPackageName(PAQUETE), null)
+            } else Estado(true, pm.getInstallerPackageName(paquete), null)
         } catch (e: Exception) {
             Estado(false, null, null)
         }
     }
 
-    fun nombre(p: String?): String = when {
-        p == null -> "(nadie)"
-        p == PLAY -> "Google Play ✅"
-        p == "com.android.chrome" -> "Chrome ❌"
-        p.contains("packageinstaller") -> "el instalador del celular ($p)"
-        else -> p
-    }
-
     fun resumen(ctx: Context): String {
         val e = estado(ctx)
-        if (!e.instalada) return "JTV Video: no está instalada"
-        return "JTV Video: instalada\n  Instalada por: ${nombre(e.instaladoPor)}\n  Pedido por: ${nombre(e.pedidoPor)}\n" +
+        if (!e.instalada) return "$nombre: no está instalada"
+        return "$nombre: instalada\n  Instalada por: ${InstaladorVideo.nombre(e.instaladoPor)}\n  Pedido por: ${InstaladorVideo.nombre(e.pedidoPor)}\n" +
             (if (e.lista) "  → Android Auto SÍ la muestra ✅" else "  → Android Auto la esconde ❌")
     }
 
-    /** Descarga la última TVJAT-Video.apk de GitHub. Avisa el avance (0-100). */
+    /** Descarga la última versión del APK de GitHub. Avisa el avance (0-100). */
     fun descargar(ctx: Context, avance: (Int) -> Unit) {
-        var url = URL_APK
+        var url = urlApk
         var con: HttpURLConnection
         var saltos = 0
         while (true) {
@@ -106,14 +96,39 @@ object InstaladorVideo {
     }
 }
 
+object InstaladorVideo {
+    const val PLAY = "com.android.vending"
+    const val AUTORIDAD = "ec.jat.tv.apk"
+    val VIDEO = AppCarro("ec.jat.tv.video", "TVJAT-Video.apk", "JTV Video")
+    val YOUTUBE = AppCarro("ec.jat.tv.youtube", "TVJAT-YouTube.apk", "JTV YouTube")
+    val TODAS = listOf(VIDEO, YOUTUBE)
+
+    // lo de siempre (JTV Video)
+    val PAQUETE get() = VIDEO.paquete
+    fun estado(ctx: Context) = VIDEO.estado(ctx)
+    fun resumen(ctx: Context) = TODAS.joinToString("\n") { it.resumen(ctx) }
+
+    fun nombre(p: String?): String = when {
+        p == null -> "(nadie)"
+        p == PLAY -> "Google Play ✅"
+        p == "com.android.chrome" -> "Chrome ❌"
+        p.contains("packageinstaller") -> "el instalador del celular ($p)"
+        else -> p
+    }
+
+    /** El APK descargado que pide el instalador (por su nombre). */
+    fun archivoPorNombre(ctx: Context, nombre: String?): File =
+        (TODAS.firstOrNull { it.archivoApk == nombre } ?: VIDEO).archivo(ctx)
+}
+
 /** Entrega el APK descargado al instalador del sistema (solo lectura, sin exponer otros archivos). */
 class ApkProvider : ContentProvider() {
     override fun onCreate() = true
     override fun getType(uri: Uri) = "application/vnd.android.package-archive"
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor =
-        ParcelFileDescriptor.open(InstaladorVideo.archivo(context!!), ParcelFileDescriptor.MODE_READ_ONLY)
+        ParcelFileDescriptor.open(InstaladorVideo.archivoPorNombre(context!!, uri.lastPathSegment), ParcelFileDescriptor.MODE_READ_ONLY)
     override fun query(u: Uri, p: Array<String>?, s: String?, a: Array<String>?, o: String?): Cursor {
-        val f = InstaladorVideo.archivo(context!!)
+        val f = InstaladorVideo.archivoPorNombre(context!!, u.lastPathSegment)
         return android.database.MatrixCursor(arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE))
             .apply { addRow(arrayOf<Any>(f.name, f.length())) }
     }

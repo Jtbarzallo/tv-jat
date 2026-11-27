@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fondo del ícono de JTV YouTube: rojo intenso hacia el violeta de JTV -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient android:angle="315" android:startColor="#FF2D55" android:centerColor="#C3165A" android:endColor="#3B22C8" />
+</shape>

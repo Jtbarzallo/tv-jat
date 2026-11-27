@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Lee el "modo pasajero" de la app JTV y anota en su diagnóstico -->
+    <queries>
+        <package android:name="ec.jat.tv" />
+        <provider android:authorities="ec.jat.tv.datos" />
+    </queries>
+
+    <application
+        android:icon="@mipmap/ic_launcher"
+        android:label="JTV YouTube"
+        android:usesCleartextTraffic="false"
+        android:theme="@style/Jtv">
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+        <meta-data
+            android:name="androidx.car.app.minCarApiLevel"
+            android:value="1" />
+
+        <!-- Iniciar sesión de YouTube desde el celular: JTV → ⋮ → Iniciar sesión de YouTube (carro) -->
+        <activity
+            android:name=".YouTubeLoginActivity"
+            android:exported="true"
+            android:label="Iniciar sesión de YouTube"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- YouTube CON IMAGEN en la pantalla del carro (como JTV Video) -->
+        <service
+            android:name="ec.jat.tv.YouTubeServicio"
+            android:exported="true"
+            android:label="JTV YouTube"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

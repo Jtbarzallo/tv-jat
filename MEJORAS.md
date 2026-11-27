@@ -233,3 +233,13 @@
   igual que la TV. Iniciar sesión: desde el celular, JTV → ⋮ → "Iniciar sesión de TikTok (carro)" (la cuenta queda
   guardada dentro de JTV Video). Respaldo: la sesión de TikTok son cookies de TikTok (si se borra, se vuelve a iniciar
   sesión); no hay datos de Jorge que respaldar.
+- 2026-11-26: Jorge pide YouTube en Android Auto como app aparte, con ícono visible como TikTok, e inicio de sesión
+  desde el celular → v1.26: nueva app "JTV YouTube" (módulo android/youtube, TVJAT-YouTube.apk, paquete
+  ec.jat.tv.youtube) con su propio ícono en Android Auto (logo JTV sobre rojo→violeta). Muestra m.youtube.com en la
+  pantalla del carro; barra: ← atrás, 🏠 inicio, 🔍 buscar (teclado del carro), ⏯; ▲ ▼ y deslizar para bajar;
+  tocar la pantalla toca la página; pantalla completa del video funciona. Se instala "como de Google Play" desde
+  JTV → ⋮ → "Poner JTV YouTube en el carro" (el instalador ahora sirve para JTV Video y JTV YouTube) y la sesión
+  se inicia desde JTV → ⋮ → "Iniciar sesión de YouTube (carro)". Google puede bloquear el inicio de sesión dentro de
+  un navegador de app; si pasa, YouTube funciona sin cuenta (Jorge no respondió esa pregunta; se tomó la opción
+  recomendada: versión para celular y seguir sin cuenta si Google bloquea). Seguridad: usa el mismo "modo pasajero"
+  de JTV. Respaldo: la sesión son cookies de YouTube/Google; no hay datos de Jorge que respaldar.

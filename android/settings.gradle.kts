@@ -6,4 +6,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "TVJAT"
-include(":app", ":video")
+include(":app", ":video", ":youtube")

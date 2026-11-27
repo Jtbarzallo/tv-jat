@@ -34,6 +34,7 @@ jobs:
         run: |
           cp app/build/outputs/apk/release/app-release.apk ../TVJAT.apk
           cp video/build/outputs/apk/release/video-release.apk ../TVJAT-Video.apk
+          cp youtube/build/outputs/apk/release/youtube-release.apk ../TVJAT-YouTube.apk
       - name: Publicar descarga
         uses: softprops/action-gh-release@v2
         with:
@@ -41,10 +42,12 @@ jobs:
           name: TV JAT v1.0.${{ github.run_number }}
           body: |
             - **TVJAT.apk**: la app TV JAT (celular, TV y Android Auto con sonido).
-            - **TVJAT-Video.apk**: TV JAT Video, para ver canales y películas CON IMAGEN en Android Auto. Instala primero TV JAT.
+            - **TVJAT-Video.apk**: JTV Video, para ver canales, películas y TikTok CON IMAGEN en Android Auto. Instala primero JTV.
+            - **TVJAT-YouTube.apk**: JTV YouTube, YouTube en Android Auto. Se instala desde JTV → ⋮ → Poner JTV YouTube en el carro.
           files: |
             TVJAT.apk
             TVJAT-Video.apk
+            TVJAT-YouTube.apk
           make_latest: true
       - name: Guardar registro si falla
         if: failure()

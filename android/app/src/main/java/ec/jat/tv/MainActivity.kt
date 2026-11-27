@@ -84,23 +84,26 @@ class MainActivity : Activity() {
         revisarVideoCarro()
     }
 
-    // ---------------- JTV Video en el carro ----------------
-    /** Si JTV Video está instalada pero Android Auto la esconde, ofrece arreglarlo. */
+    // ---------------- apps del carro (JTV Video y JTV YouTube) ----------------
+    /** App del carro que se está instalando (para saber de cuál es la respuesta del instalador). */
+    private var appEnCurso: AppCarro = InstaladorVideo.VIDEO
+
+    /** Si una app del carro está instalada pero Android Auto la esconde, ofrece arreglarlo. */
     private fun revisarVideoCarro() {
         if (avisoCarroMostrado) return
-        val e = InstaladorVideo.estado(this)
-        if (!e.instalada || e.lista) return
+        val ap = InstaladorVideo.TODAS.firstOrNull { val e = it.estado(this); e.instalada && !e.lista } ?: return
         avisoCarroMostrado = true
         AlertDialog.Builder(this)
-            .setTitle("🚗 JTV Video no sale en el carro")
+            .setTitle("🚗 ${ap.nombre} no sale en el carro")
             .setMessage("Android Auto la esconde porque fue instalada desde Chrome y no desde Google Play.\n\n" +
                 "JTV la puede reinstalar de la forma correcta. Solo toca los botones que vayan saliendo.")
-            .setPositiveButton("Arreglar ahora") { _, _ -> instalarVideo() }
+            .setPositiveButton("Arreglar ahora") { _, _ -> instalarApp(ap) }
             .setNegativeButton("Después", null)
             .show()
     }
 
-    private fun instalarVideo() {
+    private fun instalarApp(ap: AppCarro) {
+        appEnCurso = ap
         if (android.os.Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
             AlertDialog.Builder(this)
                 .setTitle("Paso 1: dar permiso")
@@ -113,46 +116,47 @@ class MainActivity : Activity() {
                 .show()
             return
         }
-        val e = InstaladorVideo.estado(this)
+        val e = ap.estado(this)
         if (e.instalada && !e.lista) {
             AlertDialog.Builder(this)
                 .setTitle("Paso 2: quitar la versión de Chrome")
-                .setMessage("Primero hay que quitar la JTV Video que instalaste desde Chrome. " +
+                .setMessage("Primero hay que quitar la ${ap.nombre} que instalaste desde Chrome. " +
                     "En la pantalla que se abre toca \"Aceptar\" o \"Desinstalar\".\n\nTus canales, favoritos y películas NO se borran (están en JTV).")
                 .setPositiveButton("Continuar") { _, _ ->
                     @Suppress("DEPRECATION")
                     startActivityForResult(Intent(Intent.ACTION_UNINSTALL_PACKAGE,
-                        Uri.parse("package:${InstaladorVideo.PAQUETE}")).putExtra(Intent.EXTRA_RETURN_RESULT, true),
+                        Uri.parse("package:${ap.paquete}")).putExtra(Intent.EXTRA_RETURN_RESULT, true),
                         PEDIR_DESINSTALAR)
                 }
                 .setNegativeButton("Cancelar", null)
                 .show()
             return
         }
-        descargarEInstalarVideo()
+        descargarEInstalar(ap)
     }
 
-    private fun descargarEInstalarVideo() {
-        val texto = TextView(this).apply { textSize = 18f; setPadding(50, 40, 50, 40); text = "Descargando JTV Video… 0 %" }
+    private fun descargarEInstalar(ap: AppCarro) {
+        appEnCurso = ap
+        val texto = TextView(this).apply { textSize = 18f; setPadding(50, 40, 50, 40); text = "Descargando ${ap.nombre}… 0 %" }
         val dlg = AlertDialog.Builder(this).setTitle("Paso 3: descargar").setView(texto).setCancelable(false).show()
         thread {
             try {
-                InstaladorVideo.descargar(this) { p -> runOnUiThread { texto.text = "Descargando JTV Video… $p %" } }
-                runOnUiThread { dlg.dismiss(); lanzarInstalador() }
+                ap.descargar(this) { p -> runOnUiThread { texto.text = "Descargando ${ap.nombre}… $p %" } }
+                runOnUiThread { dlg.dismiss(); lanzarInstalador(ap) }
             } catch (ex: Exception) {
                 runOnUiThread {
                     dlg.dismiss()
                     AlertDialog.Builder(this).setTitle("No se pudo descargar")
                         .setMessage("Revisa que tengas internet y vuelve a intentar.\n\n(${ex.message})")
-                        .setPositiveButton("Reintentar") { _, _ -> descargarEInstalarVideo() }
+                        .setPositiveButton("Reintentar") { _, _ -> descargarEInstalar(ap) }
                         .setNegativeButton("Cerrar", null).show()
                 }
             }
         }
     }
 
-    private fun lanzarInstalador() {
-        val uri = InstaladorVideo.URI_APK
+    private fun lanzarInstalador(ap: AppCarro) {
+        val uri = ap.uriApk
         @Suppress("DEPRECATION")
         val base = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
@@ -163,7 +167,7 @@ class MainActivity : Activity() {
             putExtra("android.intent.extra.INSTALL_REASON", 1)
             putExtra(Intent.EXTRA_RETURN_RESULT, true)
         }
-        Registro.anotar(this, "Instalar JTV Video: lanzando instalador")
+        Registro.anotar(this, "Instalar ${ap.nombre}: lanzando instalador")
         // Primero el instalador de Google directo (el de Xiaomi a veces no pasa el dato de "Google Play")
         for (p in listOf("com.google.android.packageinstaller", "com.android.packageinstaller")) {
             val i = Intent(base).setPackage(p)
@@ -180,32 +184,43 @@ class MainActivity : Activity() {
         startActivityForResult(base, PEDIR_INSTALAR)
     }
 
-    private fun resultadoVideo() {
-        val e = InstaladorVideo.estado(this)
-        Registro.anotar(this, InstaladorVideo.resumen(this))
+    private fun resultadoApp(ap: AppCarro) {
+        val e = ap.estado(this)
+        Registro.anotar(this, ap.resumen(this))
         val b = AlertDialog.Builder(this)
         when {
             e.lista -> b.setTitle("✅ Listo")
-                .setMessage("JTV Video quedó instalada como de Google Play. Ahora Android Auto sí la muestra.\n\n" +
-                    "1. Desconecta el celular del carro.\n2. Vuelve a conectarlo.\n3. Toca los cuadritos ▦ y busca el ícono violeta de \"JTV Video\".")
+                .setMessage("${ap.nombre} quedó instalada como de Google Play. Ahora Android Auto sí la muestra.\n\n" +
+                    "1. Desconecta el celular del carro.\n2. Vuelve a conectarlo.\n3. Toca los cuadritos ▦ y busca el ícono de \"${ap.nombre}\".")
                 .setPositiveButton("OK", null)
             !e.instalada -> b.setTitle("No se terminó de instalar")
                 .setMessage("La instalación se canceló. Vuelve a intentar y toca \"Instalar\" cuando lo pida.")
-                .setPositiveButton("Reintentar") { _, _ -> instalarVideo() }
+                .setPositiveButton("Reintentar") { _, _ -> instalarApp(ap) }
                 .setNegativeButton("Cerrar", null)
             else -> b.setTitle("⚠️ Se instaló, pero el celular no la marcó como de Google Play")
-                .setMessage(InstaladorVideo.resumen(this) + "\n\nToca \"Compartir\" y mándale este mensaje a Claude.")
+                .setMessage(ap.resumen(this) + "\n\nToca \"Compartir\" y mándale este mensaje a Claude.")
                 .setPositiveButton("Compartir") { _, _ ->
                     startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "JTV " +
                             packageManager.getPackageInfo(packageName, 0).versionName + " / Android " +
                             android.os.Build.VERSION.RELEASE + " / " + android.os.Build.MANUFACTURER + " " +
-                            android.os.Build.MODEL + "\n" + InstaladorVideo.resumen(this@MainActivity) + "\n\n" + Registro.leer(this@MainActivity))
+                            android.os.Build.MODEL + "\n" + ap.resumen(this@MainActivity) + "\n\n" + Registro.leer(this@MainActivity))
                     }, "Compartir"))
                 }
                 .setNegativeButton("Cerrar", null)
         }
         b.show()
+    }
+
+    /** Menú: poner una app del carro (o reinstalarla para actualizarla). */
+    private fun ponerAppCarro(ap: AppCarro) {
+        val e = ap.estado(this)
+        if (e.lista) AlertDialog.Builder(this).setTitle("🚗 ${ap.nombre}")
+            .setMessage("Ya está bien instalada (como de Google Play). Debe salir en el carro con su ícono.\n\n" +
+                "¿Quieres reinstalarla igual (por ejemplo, para actualizarla)?")
+            .setPositiveButton("Reinstalar") { _, _ -> descargarEInstalar(ap) }
+            .setNegativeButton("No", null).show()
+        else instalarApp(ap)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -453,6 +468,8 @@ class MainActivity : Activity() {
         menu.menu.add(0, 8, 0, "🚗 Poner JTV Video en el carro")
         menu.menu.add(0, 9, 0, "🎤 Activar micrófono del carro")
         menu.menu.add(0, 10, 0, "🎵 Iniciar sesión de TikTok (carro)")
+        menu.menu.add(0, 11, 0, "▶ Poner JTV YouTube en el carro")
+        menu.menu.add(0, 12, 0, "▶ Iniciar sesión de YouTube (carro)")
         menu.menu.add(0, 5, 0, "🩺 Revisar qué canales funcionan")
         menu.menu.add(0, 6, 0, if (Datos.ocultarCaidos(this)) "👁 Mostrar también los que no funcionan"
                                else "🙈 Ocultar los que no funcionan")
@@ -492,15 +509,11 @@ class MainActivity : Activity() {
                         aviso("En Permisos → Micrófono → Permitir")
                     } catch (e2: Exception) { aviso("Primero instala JTV Video: ⋮ → Poner JTV Video en el carro") }
                 }
-                8 -> {
-                    val e = InstaladorVideo.estado(this)
-                    if (e.lista) AlertDialog.Builder(this).setTitle("🚗 JTV Video")
-                        .setMessage("Ya está bien instalada (como de Google Play). Debe salir en el carro con el ícono violeta de JTV.\n\n" +
-                            "¿Quieres reinstalarla igual (por ejemplo, para actualizarla)?")
-                        .setPositiveButton("Reinstalar") { _, _ -> descargarEInstalarVideo() }
-                        .setNegativeButton("No", null).show()
-                    else instalarVideo()
-                }
+                8 -> ponerAppCarro(InstaladorVideo.VIDEO)
+                11 -> ponerAppCarro(InstaladorVideo.YOUTUBE)
+                12 -> try {
+                    startActivity(Intent().setClassName("ec.jat.tv.youtube", "ec.jat.tv.YouTubeLoginActivity"))
+                } catch (e: Exception) { aviso("Primero instala JTV YouTube: ⋮ → Poner JTV YouTube en el carro") }
                 6 -> {
                     Datos.setOcultarCaidos(this, !Datos.ocultarCaidos(this))
                     filtrar()
@@ -575,16 +588,16 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
             PEDIR_PERMISO_INSTALAR -> {
-                if (android.os.Build.VERSION.SDK_INT >= 26 && packageManager.canRequestPackageInstalls()) instalarVideo()
+                if (android.os.Build.VERSION.SDK_INT >= 26 && packageManager.canRequestPackageInstalls()) instalarApp(appEnCurso)
                 else aviso("Falta activar el permiso para que JTV pueda instalar")
                 return
             }
             PEDIR_DESINSTALAR -> {
-                if (!InstaladorVideo.estado(this).instalada) descargarEInstalarVideo()
+                if (!appEnCurso.estado(this).instalada) descargarEInstalar(appEnCurso)
                 else aviso("No se quitó la versión anterior. Vuelve a intentar.")
                 return
             }
-            PEDIR_INSTALAR -> { resultadoVideo(); return }
+            PEDIR_INSTALAR -> { resultadoApp(appEnCurso); return }
         }
         val uri = data?.data ?: return
         if (resultCode != RESULT_OK) return
