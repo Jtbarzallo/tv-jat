@@ -277,7 +277,9 @@ object Transmitir {
         setTextColor(Color.WHITE)
         textSize = 17f
         setPadding((18 * d).toInt(), (12 * d).toInt(), (18 * d).toInt(), (12 * d).toInt())
-        background = GradientDrawable().apply { setColor(0xFF2A3156.toInt()); cornerRadius = 14 * d }
+        typeface = Jtv.titulo(act)
+        background = Jtv.forma(act, 14f, 10f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.9f), Jtv.conAlfa(Jtv.SUPERFICIE, 0.9f)), Jtv.LINEA, 1.2f)
         setOnClickListener { alTocar() }
+        Jtv.vivo(this)
     }
 }

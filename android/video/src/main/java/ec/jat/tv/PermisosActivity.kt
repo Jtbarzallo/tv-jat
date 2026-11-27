@@ -16,9 +16,9 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * Pantalla pequeña en el CELULAR para dar a TV JAT Video sus permisos de una vez:
+ * Pantalla pequeña en el CELULAR para dar a JTV Video sus permisos de una vez:
  * 🎤 micrófono (búsqueda por voz en el carro), 📍 ubicación (modo pasajero) y 🎬 videos (Mis Películas).
- * Se abre desde TV JAT → ⋮ → "🎤 Activar micrófono del carro".
+ * Se abre desde JTV → ⋮ → "🎤 Activar micrófono del carro".
  */
 class PermisosActivity : Activity() {
     private val PEDIR = 7
@@ -39,28 +39,21 @@ class PermisosActivity : Activity() {
         val caja = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(0xFF0B0E1A.toInt())
+            background = Jtv.Fondo()
             setPadding((24 * d).toInt(), (24 * d).toInt(), (24 * d).toInt(), (24 * d).toInt())
         }
-        caja.addView(TextView(this).apply {
-            text = "TV JAT Video (carro)"
-            setTextColor(Color.WHITE); textSize = 24f; setTypeface(typeface, Typeface.BOLD); gravity = Gravity.CENTER
-        })
+        caja.addView(Jtv.logo(this, 44), LinearLayout.LayoutParams(-2, (44 * d).toInt()))
+        caja.addView(Jtv.titular(this, "Video (carro)", 22f).apply { gravity = Gravity.CENTER; setPadding(0, (12 * d).toInt(), 0, 0) })
         texto = TextView(this).apply {
-            setTextColor(0xFFDDE3F0.toInt()); textSize = 19f; gravity = Gravity.CENTER
-            setPadding(0, (18 * d).toInt(), 0, (18 * d).toInt())
+            setTextColor(Jtv.TEXTO2); textSize = 18f; gravity = Gravity.CENTER
+            setPadding(0, (18 * d).toInt(), 0, (22 * d).toInt())
         }
         caja.addView(texto)
-        caja.addView(Button(this).apply {
-            text = "Abrir ajustes de la app"; textSize = 17f
-            setOnClickListener {
-                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
-            }
-        })
-        caja.addView(Button(this).apply {
-            text = "Listo"; textSize = 17f
-            setOnClickListener { finish() }
-        })
+        caja.addView(Jtv.botonPrimario(this, "Abrir ajustes de la app") {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+        }, LinearLayout.LayoutParams(-2, -2))
+        caja.addView(Jtv.botonSecundario(this, "Listo") { finish() },
+            LinearLayout.LayoutParams(-2, -2).apply { topMargin = (12 * d).toInt() })
         setContentView(caja)
         pintar()
         val faltan = permisos().filter { !tiene(it) }
@@ -72,7 +65,7 @@ class PermisosActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         pintar()
-        Registro.anotar(this, "   🎤 permisos de TV JAT Video: micrófono ${if (tiene(Manifest.permission.RECORD_AUDIO)) "✅" else "❌"}")
+        Registro.anotar(this, "   🎤 permisos de JTV Video: micrófono ${if (tiene(Manifest.permission.RECORD_AUDIO)) "✅" else "❌"}")
     }
 
     private fun pintar() {

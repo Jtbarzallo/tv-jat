@@ -86,7 +86,7 @@ object Peliculas {
 
     // ---------- miniaturas ----------
 
-    // ---------- avance: se guarda en TV JAT (mismo respaldo que el celular) ----------
+    // ---------- avance: se guarda en JTV (mismo respaldo que el celular) ----------
     fun progresoJson(ctx: Context): JSONObject = Datos.progreso(ctx)
 
     fun posicion(ctx: Context, p: Pelicula): Long {

@@ -14,7 +14,7 @@ import java.io.File
 import java.io.FileNotFoundException
 
 /**
- * Puente con la app "TV JAT Video" (Android Auto con imagen).
+ * Puente con la app "JTV Video" (Android Auto con imagen).
  * Solo responde a apps firmadas con la misma llave de JAT. Así los datos siguen en un solo lugar
  * (esta app) y entran en el mismo respaldo de Descargas/TVJAT.
  */
@@ -30,7 +30,7 @@ class DatosProvider : ContentProvider() {
     }
 
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
-        if (!autorizado()) throw SecurityException("TV JAT: app no autorizada")
+        if (!autorizado()) throw SecurityException("JTV: app no autorizada")
         val ctx = context!!
         val b = Bundle()
         when (method) {
@@ -65,7 +65,7 @@ class DatosProvider : ContentProvider() {
     }
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
-        if (!autorizado()) throw SecurityException("TV JAT: app no autorizada")
+        if (!autorizado()) throw SecurityException("JTV: app no autorizada")
         val f = File(context!!.filesDir, "lista.m3u")
         if (!f.exists()) throw FileNotFoundException("Sin lista")
         return ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY)

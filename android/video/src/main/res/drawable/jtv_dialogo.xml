@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fondo de las ventanas emergentes de JTV: navy con degradado y borde azul -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="18dp" android:insetRight="18dp" android:insetTop="24dp" android:insetBottom="24dp">
+    <shape android:shape="rectangle">
+        <corners android:radius="22dp" />
+        <gradient android:angle="315" android:startColor="#14205A" android:centerColor="#0C1640" android:endColor="#081030" />
+        <stroke android:width="1dp" android:color="#594F7BFF" />
+    </shape>
+</inset>

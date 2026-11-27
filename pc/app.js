@@ -44,7 +44,7 @@ function fechaTexto(d) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 function unirDatos(j, reemplazarTodo) {
-  if (j.app !== 'TV JAT') throw new Error('Ese archivo no es un respaldo de TV JAT');
+  if (j.app !== 'TV JAT') throw new Error('Ese archivo no es un respaldo de JTV');
   const base = reemplazarTodo ? nuevoDatos() : D;
   if (j.listaM3u) base.listaM3u = j.listaM3u;
   base.favoritos = [...new Set([...(reemplazarTodo ? [] : base.favoritos), ...(j.favoritos || [])])];
@@ -172,7 +172,7 @@ function filaCanal(c, i) {
   const logo = /^https?:/.test(c.logo) ? `<img loading="lazy" src="${esc(c.logo)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'sinLogo',textContent:'📺'}))">` : '<div class="sinLogo">📺</div>';
   return `<div class="canal${actual && actual.url === c.url ? ' actual' : ''}${caido ? ' caido' : ''}" data-i="${i}">${logo}
     <div class="txt"><div class="nom">${esc(c.nombre)}</div><div class="gru">${esc(grupoDe(c))}${caido ? ' · no responde' : ''}</div></div>
-    <button class="estrella" data-f="${i}" title="Favorito">${fav ? '★' : '☆'}</button></div>`;
+    <button class="estrella${fav ? ' si' : ''}" data-f="${i}" title="Favorito">${fav ? '★' : '☆'}</button></div>`;
 }
 let listaMostrada = [];
 function pintarCanales() {

@@ -7,8 +7,8 @@ import android.os.SystemClock
 import org.json.JSONObject
 
 /**
- * TV JAT Video no guarda datos propios: todo (lista, favoritos, último canal, avance de películas,
- * opciones) vive en la app TV JAT, que ya hace el respaldo en Descargas/TVJAT. Esto lo pide y lo guarda allá.
+ * JTV Video no guarda datos propios: todo (lista, favoritos, último canal, avance de películas,
+ * opciones) vive en la app JTV, que ya hace el respaldo en Descargas/TVJAT. Esto lo pide y lo guarda allá.
  */
 object Puente {
     private const val AUTORIDAD = "ec.jat.tv.datos"
@@ -22,7 +22,7 @@ object Puente {
     private var estadoCache: Bundle? = null
     private var estadoHora = 0L
 
-    /** Estado de TV JAT (se guarda 1,5 s para no preguntar mil veces seguidas). */
+    /** Estado de JTV (se guarda 1,5 s para no preguntar mil veces seguidas). */
     fun estado(ctx: Context): Bundle {
         val ahora = SystemClock.elapsedRealtime()
         val c = estadoCache
@@ -36,7 +36,7 @@ object Puente {
     fun hayTvJat(ctx: Context) = llamar(ctx, "estado") != null
 }
 
-/** Mismos nombres que en TV JAT, pero los datos vienen por el Puente. */
+/** Mismos nombres que en JTV, pero los datos vienen por el Puente. */
 object Datos {
     fun textoLista(ctx: Context): String? = try {
         ctx.contentResolver.openInputStream(Puente.LISTA)?.use { it.bufferedReader().readText() }
@@ -55,7 +55,7 @@ object Datos {
     fun setFormaImagen(ctx: Context, v: String) { Puente.llamar(ctx, "formaImagen", v); Puente.olvidar() }
     fun ajusteImagen(ctx: Context): String = Puente.estado(ctx).getString("ajusteImagen") ?: "completa"
     fun setAjusteImagen(ctx: Context, v: String) { Puente.llamar(ctx, "ajusteImagen", v); Puente.olvidar() }
-    /** Agrega o quita el canal de Favoritos (en TV JAT). Devuelve true si quedó como favorito. */
+    /** Agrega o quita el canal de Favoritos (en JTV). Devuelve true si quedó como favorito. */
     fun cambiarFavorito(ctx: Context, url: String): Boolean {
         val b = Puente.llamar(ctx, "favorito", url)
         Puente.olvidar()
@@ -71,7 +71,7 @@ object Reproduccion {
         "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
 }
 
-/** El diagnóstico se anota en TV JAT (⋮ → 🔧 Diagnóstico Android Auto). */
+/** El diagnóstico se anota en JTV (⋮ → 🔧 Diagnóstico Android Auto). */
 object Registro {
     private var instalado = false
     private var app: Context? = null
@@ -83,13 +83,13 @@ object Registro {
         val previo = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { hilo, e ->
             val sw = java.io.StringWriter(); e.printStackTrace(java.io.PrintWriter(sw))
-            app?.let { anotar(it, "❌ TV JAT VIDEO SE CERRÓ: " + sw.toString().lines().take(25).joinToString("\n    ")) }
+            app?.let { anotar(it, "❌ JTV VIDEO SE CERRÓ: " + sw.toString().lines().take(25).joinToString("\n    ")) }
             previo?.uncaughtException(hilo, e)
         }
     }
 }
 
-/** Pide a TV JAT que calle el modo radio si está sonando (para que no suenen los dos). */
+/** Pide a JTV que calle el modo radio si está sonando (para que no suenen los dos). */
 object AutoService {
     var ctx: Context? = null
     fun pausarSiSuena() { ctx?.let { Puente.llamar(it, "pausarRadio") } }

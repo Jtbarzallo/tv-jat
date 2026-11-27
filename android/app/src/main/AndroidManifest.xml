@@ -12,7 +12,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
-    <!-- Para instalar TV JAT Video como "de Google Play" (si no, Android Auto la esconde) -->
+    <!-- Para instalar JTV Video como "de Google Play" (si no, Android Auto la esconde) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
@@ -37,12 +37,12 @@
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="TV JAT"
+        android:label="JTV"
         android:banner="@drawable/banner_tv"
         android:usesCleartextTraffic="true"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@style/Jtv">
 
-        <!-- Le dice a Android Auto que TV JAT es una app de audio (los canales se escuchan en el carro) -->
+        <!-- Le dice a Android Auto que JTV es una app de audio (los canales se escuchan en el carro) -->
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
@@ -52,7 +52,7 @@
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
             android:value="ec.jat.tv.CastOpciones" />
 
-        <!-- Entrega el APK de TV JAT Video al instalador del sistema -->
+        <!-- Entrega el APK de JTV Video al instalador del sistema -->
         <provider
             android:name=".ApkProvider"
             android:authorities="ec.jat.tv.apk"
@@ -97,7 +97,7 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:supportsPictureInPicture="true"
             android:resizeableActivity="true"
-            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+            android:theme="@style/Jtv.Pantalla" />
 
         <!-- "Mis Películas": ícono propio en el celular, estilo Netflix -->
         <activity
@@ -123,7 +123,7 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:supportsPictureInPicture="true"
             android:resizeableActivity="true"
-            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+            android:theme="@style/Jtv.Pantalla" />
 
         <!-- Presta las películas del celular a la TV por el WiFi -->
         <service
@@ -137,11 +137,11 @@
             android:authorities="ec.jat.tv.logos"
             android:exported="true" />
 
-        <!-- TV JAT en Android Auto: canales como radio -->
+        <!-- JTV en Android Auto: canales como radio -->
         <service
             android:name=".AutoService"
             android:exported="true"
-            android:label="TV JAT"
+            android:label="JTV"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaLibraryService" />
@@ -149,7 +149,7 @@
             </intent-filter>
         </service>
 
-        <!-- Le pasa la lista, favoritos y avance de películas a la app TV JAT Video (solo apps firmadas por JAT) -->
+        <!-- Le pasa la lista, favoritos y avance de películas a la app JTV Video (solo apps firmadas por JAT) -->
         <provider
             android:name=".DatosProvider"
             android:authorities="ec.jat.tv.datos"

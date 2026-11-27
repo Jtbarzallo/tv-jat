@@ -61,7 +61,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Reproductor de canales del celular — igual que TV JAT Video en el carro:
+ * Reproductor de canales del celular — igual que JTV Video en el carro:
  * tocar el video muestra/esconde la interfaz (lista a la derecha, botones redondos, barra de información),
  * 🎤 Voz para buscar, ⭐ favorito, línea de tiempo con grabador, calidad, sin internet reintenta el mismo canal.
  * Del celular se conservan: 📡 Ver en TV (Google Cast), ventana flotante (PiP) y control remoto.
@@ -91,12 +91,12 @@ class PlayerActivity : Activity() {
     @Volatile private var canalActual: Canal? = null
     @Volatile private var calidadMem = "auto"
 
-    // colores (los mismos del carro)
-    private val AZUL_SEL = 0xFF1F3B5E.toInt()
-    private val ACENTO = 0xFF2F8BFF.toInt()
-    private val ROJO = 0xFFE53935.toInt()
-    private val GRIS = 0xFFB4BAC2.toInt()
-    private val BOTON = 0xCC3A3F47.toInt()
+    // colores de JTV (los mismos del carro)
+    private val AZUL_SEL = 0xFF1A2A78.toInt()
+    private val ACENTO = Jtv.CIELO
+    private val ROJO = Jtv.VIVO
+    private val GRIS = Jtv.TEXTO2
+    private val BOTON = Jtv.conAlfa(Jtv.SUPERFICIE2, 0.85f)
 
     // piezas de la interfaz
     private lateinit var lista: ListView
@@ -140,10 +140,10 @@ class PlayerActivity : Activity() {
         aviso = TextView(this).apply {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            setTypeface(typeface, Typeface.BOLD)
+            typeface = Jtv.titulo(this@PlayerActivity)
             gravity = Gravity.CENTER
-            background = redondo(0xCC000000.toInt(), dp(14).toFloat())
-            setPadding(dp(22), dp(14), dp(22), dp(14))
+            background = Jtv.forma(this@PlayerActivity, 18f, 14f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.92f), Jtv.conAlfa(Jtv.NAVY, 0.92f)), Jtv.LINEA, 1.2f)
+            setPadding(dp(26), dp(16), dp(26), dp(16))
             visibility = View.GONE
         }
         raiz.addView(aviso, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
@@ -172,8 +172,10 @@ class PlayerActivity : Activity() {
         text = txt
         setTextColor(Color.WHITE)
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-        setPadding(dp(12), dp(6), dp(12), dp(6))
+        typeface = Jtv.textoFuerte(this@PlayerActivity)
+        setPadding(dp(14), dp(7), dp(14), dp(7))
         setOnClickListener { accion(); tocado() }
+        Jtv.vivo(this, 0.92f, Jtv.forma(this@PlayerActivity, 12f, 8f, intArrayOf(Color.WHITE)))
     }
 
     private class Boton(val vista: LinearLayout, val icono: ImageView?, val texto: TextView)
@@ -184,23 +186,35 @@ class PlayerActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
             setOnClickListener { accion(); tocado() }
         }
-        val circulo = FrameLayout(this).apply { background = redondo(fondo) }
+        // botones con la forma JTV: el principal con degradado de la marca, cerrar en rojo, el resto de vidrio azul
+        val circulo = FrameLayout(this).apply {
+            background = when (fondo) {
+                Color.WHITE -> Jtv.forma(this@PlayerActivity, tam * 0.32f, tam * 0.22f, Jtv.MARCA)
+                ROJO -> Jtv.forma(this@PlayerActivity, tam * 0.32f, tam * 0.22f, intArrayOf(Jtv.VIVO, 0xFFB81E4E.toInt()))
+                else -> Jtv.forma(this@PlayerActivity, tam * 0.32f, tam * 0.22f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.88f), Jtv.conAlfa(Jtv.NAVY, 0.88f)), Jtv.LINEA, 1.2f)
+            }
+            if (fondo == Color.WHITE) Jtv.sombraAzul(this, 10f)
+        }
+        val tinteReal = if (fondo == Color.WHITE) Color.WHITE else tinte
         var img: ImageView? = null
         if (icono != 0) {
-            img = ImageView(this).apply { setImageResource(icono); setColorFilter(tinte) }
+            img = ImageView(this).apply { setImageResource(icono); setColorFilter(tinteReal) }
             val m = tam / 4
             circulo.addView(img, FrameLayout.LayoutParams(dp(tam - 2 * m), dp(tam - 2 * m), Gravity.CENTER))
         } else {
             circulo.addView(TextView(this).apply {
-                text = glifo; setTextColor(tinte); gravity = Gravity.CENTER
+                text = glifo; setTextColor(tinteReal); gravity = Gravity.CENTER
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, tam * 0.42f)
                 setTypeface(typeface, Typeface.BOLD)
             }, FrameLayout.LayoutParams(-1, -1))
         }
         caja.addView(circulo, LinearLayout.LayoutParams(dp(tam), dp(tam)))
+        Jtv.vivo(circulo, 0.9f)
+        circulo.setOnClickListener { accion(); tocado() }
         val t = TextView(this).apply {
-            text = etiqueta; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            text = etiqueta; setTextColor(Jtv.HIELO); gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+            typeface = Jtv.textoFuerte(this@PlayerActivity)
             setShadowLayer(4f, 0f, 1f, Color.BLACK)
             setPadding(0, dp(3), 0, 0)
         }
@@ -214,6 +228,7 @@ class PlayerActivity : Activity() {
             gravity = Gravity.CENTER
             setPadding(dp(10), dp(2), dp(10), dp(2))
             setOnClickListener { accion(); tocado() }
+            Jtv.vivo(this, 0.9f, Jtv.forma(this@PlayerActivity, 12f, 8f, intArrayOf(Color.WHITE)))
         }
         caja.addView(TextView(this).apply { text = glifo; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setTextSize(TypedValue.COMPLEX_UNIT_SP, 19f) })
         val t = TextView(this).apply { text = etiqueta; setTextColor(GRIS); gravity = Gravity.CENTER; setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f) }
@@ -231,38 +246,41 @@ class PlayerActivity : Activity() {
         val arriba = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = degradado(true, 0xDD000000.toInt())
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Jtv.conAlfa(Jtv.NEGRO, 0.92f), Jtv.conAlfa(Jtv.NAVY, 0.55f), 0x00000000))
             setPadding(dp(8), 0, dp(8), 0)
             setOnClickListener { tocado() }
         }
         chipCanales = chip("📺 Canales") { vistaPanel = "canales"; pintarPanel() }
         arriba.addView(chipCanales)
         arriba.addView(chip("🎬 Películas") { startActivity(Intent(this, PeliculasActivity::class.java)) })
-        arriba.addView(TextView(this).apply {
-            text = "TV JAT"; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f); setTypeface(typeface, Typeface.BOLD)
-        }, LinearLayout.LayoutParams(0, -2, 1f))
+        // logo oficial de JTV al centro
+        val centroLogo = FrameLayout(this)
+        centroLogo.addView(Jtv.logo(this, 26), FrameLayout.LayoutParams(-2, dp(26), Gravity.CENTER))
+        arriba.addView(centroLogo, LinearLayout.LayoutParams(0, -1, 1f))
         chipTv = chip("📡 Ver en TV") { Transmitir.elegirTv(this) { pasarATv() } }
         if (Transmitir.esTv(this)) chipTv.visibility = View.GONE
         arriba.addView(chipTv)
         arriba.addView(chip("🎤 Voz") { buscarPorVoz() }.apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f); setTypeface(typeface, Typeface.BOLD)
-            background = redondo(ROJO, 40f)
+            setTextColor(Color.WHITE); typeface = Jtv.titulo(this@PlayerActivity)
+            background = Jtv.forma(this@PlayerActivity, 14f, 10f, Jtv.MARCA)
+            Jtv.sombraAzul(this, 6f)
         }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
         cp.addView(arriba, FrameLayout.LayoutParams(-1, dp(52), Gravity.TOP))
 
         // ---- lista al costado derecho
         val pn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = redondo(0xE6151920.toInt(), dp(10).toFloat())
+            background = Jtv.forma(this@PlayerActivity, 18f, 14f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.93f), Jtv.conAlfa(Jtv.NAVY, 0.95f)), Jtv.LINEA, 1.2f)
             clipToOutline = true
+            elevation = dp(8).toFloat()
             isClickable = true
         }
         listaTitulo = TextView(this).apply {
             setTextColor(ACENTO)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            setTypeface(typeface, Typeface.BOLD)
-            setPadding(dp(12), dp(8), dp(12), dp(6))
+            typeface = Jtv.titulo(this@PlayerActivity)
+            setPadding(dp(16), dp(12), dp(14), dp(8))
             setOnClickListener {
                 vistaPanel = if (vistaPanel == "canales") "grupos" else "canales"
                 pintarPanel(); tocado()
@@ -272,6 +290,8 @@ class PlayerActivity : Activity() {
         lista = ListView(this).apply {
             adapter = adaptador
             divider = null
+            selector = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
+            setPadding(dp(6), 0, dp(6), dp(6)); clipToPadding = false
             setOnItemClickListener { _, _, pos, _ -> adaptador.filas.getOrNull(pos)?.accion?.invoke(); tocado() }
             setOnScrollListener(object : android.widget.AbsListView.OnScrollListener {
                 override fun onScrollStateChanged(v: android.widget.AbsListView?, s: Int) { tocado() }
@@ -289,7 +309,7 @@ class PlayerActivity : Activity() {
         val controles = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = degradado(false, 0xAA000000.toInt())
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x00000000, Jtv.conAlfa(Jtv.NAVY, 0.55f), Jtv.conAlfa(Jtv.NEGRO, 0.85f)))
             setPadding(dp(8), dp(10), dp(8), dp(6))
         }
         val lpB = LinearLayout.LayoutParams(0, -2, 1f)
@@ -305,8 +325,8 @@ class PlayerActivity : Activity() {
         val info = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(0xF0121519.toInt())
-            setPadding(dp(12), dp(6), dp(6), dp(6))
+            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(Jtv.conAlfa(Jtv.NAVY, 0.97f), Jtv.conAlfa(0xFF0F1A52.toInt(), 0.97f), Jtv.conAlfa(Jtv.NAVY, 0.97f)))
+            setPadding(dp(14), dp(8), dp(8), dp(8))
         }
         estrella = TextView(this).apply {
             text = "☆"; gravity = Gravity.CENTER
@@ -316,7 +336,7 @@ class PlayerActivity : Activity() {
         info.addView(estrella, LinearLayout.LayoutParams(dp(40), dp(40)).apply { rightMargin = dp(8) })
         val izq = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         infoNombre = TextView(this).apply {
-            setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f); setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f); typeface = Jtv.titulo(this@PlayerActivity)
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END
         }
         infoSub = TextView(this).apply {
@@ -338,7 +358,7 @@ class PlayerActivity : Activity() {
         infoTiempo = TextView(this).apply { setTextColor(GRIS); setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); maxLines = 1 }
         filaT.addView(infoTiempo, LinearLayout.LayoutParams(0, -2, 1f))
         infoVivo = TextView(this).apply {
-            text = "● EN VIVO"; setTextColor(ROJO); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTypeface(typeface, Typeface.BOLD)
+            text = "● EN VIVO"; setTextColor(ROJO); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); typeface = Jtv.titulo(this@PlayerActivity)
             setPadding(dp(6), dp(4), dp(2), dp(4))
             setOnClickListener { irAlDirecto(); tocado() }
         }
@@ -361,21 +381,22 @@ class PlayerActivity : Activity() {
         capaTv = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(0xF20B0E1A.toInt())
+            background = Jtv.Fondo()
             visibility = View.GONE
             isClickable = true
             setPadding(dp(20), dp(20), dp(20), dp(20))
         }
+        capaTv.addView(Jtv.logo(this, 40), LinearLayout.LayoutParams(-2, dp(40)).apply { bottomMargin = dp(18) })
         textoTv = TextView(this).apply {
             setTextColor(Color.WHITE)
             textSize = 20f
-            setTypeface(typeface, Typeface.BOLD)
+            typeface = Jtv.titulo(this@PlayerActivity)
             gravity = Gravity.CENTER
         }
         capaTv.addView(textoTv)
         capaTv.addView(TextView(this).apply {
             text = "Puedes apagar la pantalla del celular: la TV descarga el canal sola."
-            setTextColor(0xFFB8C0E0.toInt())
+            setTextColor(Jtv.TEXTO2)
             textSize = 14f
             gravity = Gravity.CENTER
             setPadding(0, dp(6), 0, dp(18))
@@ -503,7 +524,10 @@ class PlayerActivity : Activity() {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(10), dp(8), dp(10), dp(8))
-                val caja = FrameLayout(this@PlayerActivity).apply { background = redondo(0xFF0D1F4A.toInt(), dp(6).toFloat()); clipToOutline = true }
+                val caja = FrameLayout(this@PlayerActivity).apply {
+                    background = Jtv.forma(this@PlayerActivity, 10f, 7f, intArrayOf(0xFF1B2766.toInt(), 0xFF0E1745.toInt())); clipToOutline = true
+                    setPadding(dp(3), dp(3), dp(3), dp(3))
+                }
                 caja.addView(TextView(this@PlayerActivity).apply {
                     setTextColor(Color.WHITE); gravity = Gravity.CENTER
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTypeface(typeface, Typeface.BOLD)
@@ -512,12 +536,12 @@ class PlayerActivity : Activity() {
                 addView(caja, LinearLayout.LayoutParams(dp(42), dp(42)))
                 val textos = LinearLayout(this@PlayerActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), 0, 0, 0) }
                 textos.addView(TextView(this@PlayerActivity).apply {
-                    setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                    setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 15.5f)
                     maxLines = 1; ellipsize = TextUtils.TruncateAt.END
                 })
                 textos.addView(TextView(this@PlayerActivity).apply {
-                    text = "EN VIVO"; setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
-                    setTypeface(typeface, Typeface.BOLD)
+                    text = "● EN VIVO"; setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f)
+                    typeface = Jtv.titulo(this@PlayerActivity); letterSpacing = 0.06f
                     setPadding(dp(6), dp(1), dp(6), dp(1))
                 }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(3) })
                 addView(textos, LinearLayout.LayoutParams(0, -2, 1f))
@@ -529,10 +553,11 @@ class PlayerActivity : Activity() {
             val textos = fila.getChildAt(1) as LinearLayout
             (textos.getChildAt(0) as TextView).apply {
                 text = "${f.numero}. " + (if (f.fav) "★ " else "") + c.nombre
-                setTypeface(null, if (f.marcada) Typeface.BOLD else Typeface.NORMAL)
+                typeface = if (f.marcada) Jtv.titulo(this@PlayerActivity) else Jtv.texto(this@PlayerActivity)
             }
-            (textos.getChildAt(1) as TextView).background = redondo(if (f.marcada) ROJO else 0xFF8E2A28.toInt(), dp(3).toFloat())
-            fila.background = if (f.marcada) GradientDrawable().apply { setColor(AZUL_SEL); setStroke(dp(2), ACENTO) } else null
+            (textos.getChildAt(1) as TextView).background = Jtv.forma(this@PlayerActivity, 4f, 3f,
+                if (f.marcada) intArrayOf(Jtv.VIVO, 0xFFE0305F.toInt()) else intArrayOf(0xFF7A2346.toInt()))
+            fila.background = if (f.marcada) Jtv.forma(this@PlayerActivity, 12f, 9f, intArrayOf(AZUL_SEL, Jtv.conAlfa(Jtv.INDIGO, 0.6f)), Jtv.ELECTRICO, 1.6f) else null
             return fila
         }
 
@@ -543,8 +568,8 @@ class PlayerActivity : Activity() {
                 setPadding(dp(14), dp(12), dp(12), dp(12))
             }
             v.text = if (f.sub.isEmpty()) f.titulo else "${f.titulo}\n${f.sub}"
-            v.setTypeface(null, if (f.marcada) Typeface.BOLD else Typeface.NORMAL)
-            v.background = if (f.marcada) GradientDrawable().apply { setColor(AZUL_SEL); setStroke(dp(2), ACENTO) } else null
+            v.typeface = if (f.marcada) Jtv.titulo(this@PlayerActivity) else Jtv.texto(this@PlayerActivity)
+            v.background = if (f.marcada) Jtv.forma(this@PlayerActivity, 12f, 9f, intArrayOf(AZUL_SEL, Jtv.conAlfa(Jtv.INDIGO, 0.6f)), Jtv.ELECTRICO, 1.6f) else null
             return v
         }
     }
@@ -571,7 +596,7 @@ class PlayerActivity : Activity() {
         val p = player ?: return
         if (!capaVisible) return
         btnPausa.setImageResource(if (p.playWhenReady) R.drawable.ic_pausa_jat else R.drawable.ic_play_jat)
-        chipCanales.background = if (vistaPanel == "canales" || vistaPanel == "grupos") redondo(AZUL_SEL, 40f) else null
+        chipCanales.background = if (vistaPanel == "canales" || vistaPanel == "grupos") Jtv.forma(this, 12f, 8f, intArrayOf(AZUL_SEL, Jtv.conAlfa(Jtv.INDIGO, 0.7f)), Jtv.LINEA, 1f) else null
         val i = p.currentMediaItemIndex
         val c = canales.getOrNull(i)
         infoNombre.text = c?.nombre ?: ""
@@ -594,7 +619,7 @@ class PlayerActivity : Activity() {
             infoTiempo.text = "Guardado: ${colchon / 1000} s"
             infoVivo.text = "● EN VIVO"; infoVivo.visibility = View.VISIBLE
         } else {
-            barra.colorRelleno = ROJO; barra.colorGuardado = 0x66FFFFFF
+            barra.colorRelleno = Jtv.ELECTRICO; barra.colorGuardado = 0x55FFFFFF
             barra.guardado = if (dur > 0) p.bufferedPosition.toFloat() / dur else 0f
             barra.avance = if (dur > 0) pos.toFloat() / dur else 0f
             infoTiempo.text = if (dur > 0) "${hms(pos)} / ${hms(dur)}" else hms(pos)
@@ -602,8 +627,8 @@ class PlayerActivity : Activity() {
         }
         val fav = c != null && c.url in favoritos()
         estrella.text = if (fav) "★" else "☆"
-        estrella.setTextColor(if (fav) 0xFF3A2A00.toInt() else GRIS)
-        estrella.background = if (fav) redondo(0xFFF5B301.toInt()) else GradientDrawable().apply {
+        estrella.setTextColor(if (fav) 0xFF2A1F00.toInt() else GRIS)
+        estrella.background = if (fav) Jtv.forma(this, 12f, 8f, intArrayOf(Jtv.ORO, 0xFFFF9F2E.toInt())) else GradientDrawable().apply {
             shape = GradientDrawable.OVAL; setStroke(dp(2), GRIS)
         }
         infoCalidad.text = "Calidad ${calidadTexto()}"
@@ -1058,13 +1083,21 @@ class BarraTiempo(c: Context) : View(c) {
         val x0 = r; val x1 = width - r
         p.color = 0x55FFFFFF
         cv.drawRoundRect(x0, mitad - grueso / 2, x1, mitad + grueso / 2, grueso, grueso, p)
+        // los colores de la marca (cielo / eléctrico) se pintan con el degradado de JTV
+        val deg = android.graphics.LinearGradient(x0, 0f, x1, 0f, intArrayOf(Jtv.CIELO, Jtv.ELECTRICO, Jtv.VIOLETA), null, android.graphics.Shader.TileMode.CLAMP)
         if (guardado > 0f) {
             p.color = colorGuardado
+            if (colorGuardado == Jtv.CIELO) p.shader = deg
             cv.drawRoundRect(x0, mitad - grueso / 2, x0 + (x1 - x0) * guardado, mitad + grueso / 2, grueso, grueso, p)
+            p.shader = null
         }
         val xf = x0 + (x1 - x0) * avance
         p.color = colorRelleno
+        if (colorRelleno == Jtv.ELECTRICO) p.shader = deg
         cv.drawRoundRect(x0, mitad - grueso / 2, xf, mitad + grueso / 2, grueso, grueso, p)
+        p.shader = null
+        p.color = Jtv.conAlfa(Jtv.CIELO, 0.35f)
+        cv.drawCircle(xf, mitad, r * 1.45f, p)
         p.color = Color.WHITE
         cv.drawCircle(xf, mitad, r, p)
     }

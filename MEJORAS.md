@@ -215,3 +215,13 @@
   audio, con la misma numeración); 2) en vivo la barra no deja ir al borde de lo grabado (8 s de margen; 20 s si el
   canal es directo); 3) si un salto sigue cargando a los 12 s, vuelve solo al EN VIVO con un aviso. Igual en el
   celular y en el carro. Respaldo: sin datos nuevos (lo grabado es temporal en la caché).
+- 2026-11-26: Jorge pide un REDISEÑO VISUAL COMPLETO con la identidad de JTV (mandó el logo blanco, el logo a color y
+  dos banners). → v1.24 "JTV": 1) el nombre visible pasa a JTV / JTV Video (los nombres internos, archivos de
+  respaldo y la clave "app":"TV JAT" del respaldo NO cambian, para no perder datos); 2) logo oficial usado tal cual
+  (solo recortado del fondo negro, sin deformar) en la cabecera, reproductor, carro, permisos, ícono y PC; el banner
+  oficial como banner principal (inicio del celular, Android TV y PC, sin recortar el logo); 3) sistema de diseño
+  Jtv.kt (igual en celular y carro): colores eléctrico/cobalto/índigo/violeta sobre navy, forma propia con esquinas
+  cortadas en diagonal, letras Sora (títulos) y Manrope (textos), botones con degradado, brillo al tocar, rebote,
+  agrandado con mouse, chips de categorías, insignia EN VIVO, fondo con franjas diagonales; 4) tema propio para
+  ventanas emergentes y menús; 5) PC: estilos.css nuevo con las mismas reglas (fuentes incluidas, sin internet).
+  Todas las funciones siguen igual. Respaldo: sin datos nuevos (el grupo elegido en los chips no se guarda).

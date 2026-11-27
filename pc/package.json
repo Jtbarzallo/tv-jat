@@ -32,7 +32,7 @@
     "nsis": {
       "oneClick": true,
       "artifactName": "TVJAT-PC-Instalador.exe",
-      "shortcutName": "TV JAT"
+      "shortcutName": "JTV"
     },
     "portable": {
       "artifactName": "TVJAT-PC.exe"

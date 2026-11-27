@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="jtv_fondo">#050A1C</color>
+    <color name="jtv_electrico">#2F6BFF</color>
+    <color name="jtv_cielo">#7DB8FF</color>
+
+    <!-- Tema de JTV: letras Manrope, colores de la marca, ventanas y menús propios -->
+    <style name="Jtv" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">@font/manrope</item>
+        <item name="android:colorPrimary">#050A1C</item>
+        <item name="android:colorPrimaryDark">#050A1C</item>
+        <item name="android:colorAccent">#2F6BFF</item>
+        <item name="android:colorControlActivated">#7DB8FF</item>
+        <item name="android:colorControlHighlight">#337DB8FF</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#B5C3F0</item>
+        <item name="android:textColorHint">#7380B6</item>
+        <item name="android:windowBackground">@color/jtv_fondo</item>
+        <item name="android:statusBarColor">#02040C</item>
+        <item name="android:navigationBarColor">#050A1C</item>
+        <item name="android:alertDialogTheme">@style/Jtv.Dialogo</item>
+        <item name="android:popupMenuStyle">@style/Jtv.Menu</item>
+        <item name="android:dropDownListViewStyle">@style/Jtv.MenuLista</item>
+        <item name="android:textAppearanceLargePopupMenu">@style/Jtv.MenuTexto</item>
+        <item name="android:textAppearanceSmallPopupMenu">@style/Jtv.MenuTexto</item>
+    </style>
+
+    <style name="Jtv.Pantalla" parent="Jtv">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+
+    <style name="Jtv.Dialogo" parent="@android:style/Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">@font/manrope</item>
+        <item name="android:windowBackground">@drawable/jtv_dialogo</item>
+        <item name="android:colorAccent">#7DB8FF</item>
+        <item name="android:colorControlActivated">#7DB8FF</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#B5C3F0</item>
+        <item name="android:textColorHint">#7380B6</item>
+        <item name="android:windowTitleStyle">@style/Jtv.DialogoTitulo</item>
+        <item name="android:buttonBarButtonStyle">@style/Jtv.DialogoBoton</item>
+        <item name="android:backgroundDimAmount">0.7</item>
+    </style>
+
+    <style name="Jtv.DialogoTitulo" parent="@android:style/TextAppearance.Material.DialogWindowTitle">
+        <item name="android:fontFamily">@font/sora</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">#FFFFFF</item>
+    </style>
+
+    <style name="Jtv.DialogoBoton" parent="@android:style/Widget.Material.Button.Borderless.Colored">
+        <item name="android:fontFamily">@font/sora</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">#7DB8FF</item>
+    </style>
+
+    <style name="Jtv.Menu" parent="@android:style/Widget.Material.PopupMenu">
+        <item name="android:popupBackground">@drawable/jtv_menu</item>
+        <item name="android:popupElevation">12dp</item>
+    </style>
+
+    <style name="Jtv.MenuLista" parent="@android:style/Widget.Material.ListView.DropDown">
+        <item name="android:divider">@null</item>
+    </style>
+
+    <style name="Jtv.MenuTexto" parent="@android:style/TextAppearance.Material.Widget.PopupMenu.Large">
+        <item name="android:fontFamily">@font/manrope</item>
+        <item name="android:textColor">#E3EAFF</item>
+    </style>
+</resources>

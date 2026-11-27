@@ -41,9 +41,6 @@ class MainActivity : Activity() {
         private var avisoCarroMostrado = false
         private const val TODOS = "Todos los canales"
         private const val FAVORITOS = "★ Favoritos"
-        private const val FONDO = 0xFF14182C.toInt()
-        private const val TARJETA = 0xFF1E2440.toInt()
-        private const val ACENTO = 0xFF4FD1C5.toInt()
     }
 
     private var canales: List<Canal> = emptyList()
@@ -56,8 +53,13 @@ class MainActivity : Activity() {
     private lateinit var titulo: TextView
     private lateinit var estado: TextView
     private lateinit var buscar: EditText
-    private lateinit var selectorGrupo: Spinner
+    private lateinit var filaChips: LinearLayout
+    private lateinit var scrollChips: android.widget.HorizontalScrollView
+    private var grupoSel = 0              // posición en "grupos" (0 = todos)
     private lateinit var lista: ListView
+    private lateinit var heroNombre: TextView
+    private lateinit var heroEtiqueta: TextView
+    private lateinit var heroBoton: TextView
     private val adaptador = Adaptador()
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
@@ -65,8 +67,8 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Registro.instalar(this)
-        window.statusBarColor = FONDO
-        window.navigationBarColor = FONDO
+        window.statusBarColor = Jtv.NEGRO
+        window.navigationBarColor = Jtv.FONDO
         construirPantalla()
         favoritos = Datos.favoritos(this)
         caidos = Datos.caidos(this)
@@ -82,17 +84,17 @@ class MainActivity : Activity() {
         revisarVideoCarro()
     }
 
-    // ---------------- TV JAT Video en el carro ----------------
-    /** Si TV JAT Video está instalada pero Android Auto la esconde, ofrece arreglarlo. */
+    // ---------------- JTV Video en el carro ----------------
+    /** Si JTV Video está instalada pero Android Auto la esconde, ofrece arreglarlo. */
     private fun revisarVideoCarro() {
         if (avisoCarroMostrado) return
         val e = InstaladorVideo.estado(this)
         if (!e.instalada || e.lista) return
         avisoCarroMostrado = true
         AlertDialog.Builder(this)
-            .setTitle("🚗 TV JAT Video no sale en el carro")
+            .setTitle("🚗 JTV Video no sale en el carro")
             .setMessage("Android Auto la esconde porque fue instalada desde Chrome y no desde Google Play.\n\n" +
-                "TV JAT la puede reinstalar de la forma correcta. Solo toca los botones que vayan saliendo.")
+                "JTV la puede reinstalar de la forma correcta. Solo toca los botones que vayan saliendo.")
             .setPositiveButton("Arreglar ahora") { _, _ -> instalarVideo() }
             .setNegativeButton("Después", null)
             .show()
@@ -102,7 +104,7 @@ class MainActivity : Activity() {
         if (android.os.Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
             AlertDialog.Builder(this)
                 .setTitle("Paso 1: dar permiso")
-                .setMessage("En la pantalla que se abre, activa \"Permitir desde esta fuente\" para TV JAT y luego regresa con la flecha ←.")
+                .setMessage("En la pantalla que se abre, activa \"Permitir desde esta fuente\" para JTV y luego regresa con la flecha ←.")
                 .setPositiveButton("Abrir") { _, _ ->
                     startActivityForResult(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                         Uri.parse("package:$packageName")), PEDIR_PERMISO_INSTALAR)
@@ -115,8 +117,8 @@ class MainActivity : Activity() {
         if (e.instalada && !e.lista) {
             AlertDialog.Builder(this)
                 .setTitle("Paso 2: quitar la versión de Chrome")
-                .setMessage("Primero hay que quitar la TV JAT Video que instalaste desde Chrome. " +
-                    "En la pantalla que se abre toca \"Aceptar\" o \"Desinstalar\".\n\nTus canales, favoritos y películas NO se borran (están en TV JAT).")
+                .setMessage("Primero hay que quitar la JTV Video que instalaste desde Chrome. " +
+                    "En la pantalla que se abre toca \"Aceptar\" o \"Desinstalar\".\n\nTus canales, favoritos y películas NO se borran (están en JTV).")
                 .setPositiveButton("Continuar") { _, _ ->
                     @Suppress("DEPRECATION")
                     startActivityForResult(Intent(Intent.ACTION_UNINSTALL_PACKAGE,
@@ -131,11 +133,11 @@ class MainActivity : Activity() {
     }
 
     private fun descargarEInstalarVideo() {
-        val texto = TextView(this).apply { textSize = 18f; setPadding(50, 40, 50, 40); text = "Descargando TV JAT Video… 0 %" }
+        val texto = TextView(this).apply { textSize = 18f; setPadding(50, 40, 50, 40); text = "Descargando JTV Video… 0 %" }
         val dlg = AlertDialog.Builder(this).setTitle("Paso 3: descargar").setView(texto).setCancelable(false).show()
         thread {
             try {
-                InstaladorVideo.descargar(this) { p -> runOnUiThread { texto.text = "Descargando TV JAT Video… $p %" } }
+                InstaladorVideo.descargar(this) { p -> runOnUiThread { texto.text = "Descargando JTV Video… $p %" } }
                 runOnUiThread { dlg.dismiss(); lanzarInstalador() }
             } catch (ex: Exception) {
                 runOnUiThread {
@@ -161,7 +163,7 @@ class MainActivity : Activity() {
             putExtra("android.intent.extra.INSTALL_REASON", 1)
             putExtra(Intent.EXTRA_RETURN_RESULT, true)
         }
-        Registro.anotar(this, "Instalar TV JAT Video: lanzando instalador")
+        Registro.anotar(this, "Instalar JTV Video: lanzando instalador")
         // Primero el instalador de Google directo (el de Xiaomi a veces no pasa el dato de "Google Play")
         for (p in listOf("com.google.android.packageinstaller", "com.android.packageinstaller")) {
             val i = Intent(base).setPackage(p)
@@ -184,8 +186,8 @@ class MainActivity : Activity() {
         val b = AlertDialog.Builder(this)
         when {
             e.lista -> b.setTitle("✅ Listo")
-                .setMessage("TV JAT Video quedó instalada como de Google Play. Ahora Android Auto sí la muestra.\n\n" +
-                    "1. Desconecta el celular del carro.\n2. Vuelve a conectarlo.\n3. Toca los cuadritos ▦ y busca la claqueta roja \"TV JAT Video\".")
+                .setMessage("JTV Video quedó instalada como de Google Play. Ahora Android Auto sí la muestra.\n\n" +
+                    "1. Desconecta el celular del carro.\n2. Vuelve a conectarlo.\n3. Toca los cuadritos ▦ y busca el ícono violeta de \"JTV Video\".")
                 .setPositiveButton("OK", null)
             !e.instalada -> b.setTitle("No se terminó de instalar")
                 .setMessage("La instalación se canceló. Vuelve a intentar y toca \"Instalar\" cuando lo pida.")
@@ -195,7 +197,7 @@ class MainActivity : Activity() {
                 .setMessage(InstaladorVideo.resumen(this) + "\n\nToca \"Compartir\" y mándale este mensaje a Claude.")
                 .setPositiveButton("Compartir") { _, _ ->
                     startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "TV JAT " +
+                        type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "JTV " +
                             packageManager.getPackageInfo(packageName, 0).versionName + " / Android " +
                             android.os.Build.VERSION.RELEASE + " / " + android.os.Build.MANUFACTURER + " " +
                             android.os.Build.MODEL + "\n" + InstaladorVideo.resumen(this@MainActivity) + "\n\n" + Registro.leer(this@MainActivity))
@@ -215,54 +217,56 @@ class MainActivity : Activity() {
         super.onResume()
         favoritos = Datos.favoritos(this)
         adaptador.notifyDataSetChanged()
+        pintarHero()
     }
 
-    // ---------------- pantalla ----------------
+    // ---------------- pantalla (diseño JTV) ----------------
     private fun construirPantalla() {
         val raiz = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(FONDO)
-            setPadding(dp(12), dp(12), dp(12), 0)
+            background = Jtv.Fondo()
+            setPadding(dp(16), dp(14), dp(16), 0)
         }
 
+        // ---- barra de arriba: logo oficial + acciones
         val cabecera = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val textos = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        textos.addView(TextView(this).apply {
-            text = "📺 TV JAT"
-            textSize = 22f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.WHITE)
-        })
-        titulo = TextView(this).apply {
-            textSize = 13f
-            setTextColor(0xFFB0B8D0.toInt())
-            maxLines = 1
+        cabecera.addView(Jtv.logo(this, 30), LinearLayout.LayoutParams(-2, dp(30)))
+        cabecera.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        val btnPelis = Jtv.botonIcono(this, "🎬") { startActivity(Intent(this, PeliculasActivity::class.java)) }
+        cabecera.addView(btnPelis, LinearLayout.LayoutParams(dp(44), dp(44)))
+        val btnListas = Jtv.botonSecundario(this, "Listas ▾") {}.apply {
+            setPadding(dp(14), 0, dp(14), 0); Jtv.sp(this, 14f)
         }
-        textos.addView(titulo)
-        cabecera.addView(textos, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-
-        val btnPelis = boton("🎬")
-        btnPelis.setOnClickListener { startActivity(Intent(this, PeliculasActivity::class.java)) }
-        cabecera.addView(btnPelis)
-        val btnListas = boton("Listas ▾")
         btnListas.setOnClickListener { menuListas(it) }
-        cabecera.addView(btnListas)
-        val btnMas = boton("⋮")
+        cabecera.addView(btnListas, LinearLayout.LayoutParams(-2, dp(44)).apply { marginStart = dp(8) })
+        val btnMas = Jtv.botonIcono(this, "⋮") {}
         btnMas.setOnClickListener { menuMas(it) }
-        cabecera.addView(btnMas)
+        cabecera.addView(btnMas, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginStart = dp(8) })
         raiz.addView(cabecera)
 
+        titulo = TextView(this).apply {
+            Jtv.sp(this, 13f)
+            setTextColor(Jtv.TEXTO2)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        raiz.addView(titulo, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+
+        // ---- buscador
+        val fondoBuscar = Jtv.forma(this, 14f, 10f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE, 0.92f)), Jtv.LINEA, 1.2f)
         buscar = EditText(this).apply {
-            hint = "🔍 Buscar canal"
-            setHintTextColor(0xFF7A84A6.toInt())
+            hint = "🔍  Buscar canal"
+            setHintTextColor(Jtv.TEXTO3)
             setTextColor(Color.WHITE)
+            Jtv.sp(this, 15f)
             isSingleLine = true
             inputType = InputType.TYPE_CLASS_TEXT
-            background = redondo(TARJETA)
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = fondoBuscar
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setOnFocusChangeListener { _, f -> fondoBuscar.borde = if (f) Jtv.ELECTRICO else Jtv.LINEA }
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
@@ -271,47 +275,143 @@ class MainActivity : Activity() {
         }
         raiz.addView(buscar, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
 
-        selectorGrupo = Spinner(this)
-        selectorGrupo.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) = filtrar()
-            override fun onNothingSelected(p: AdapterView<*>?) {}
+        // ---- categorías (chips)
+        filaChips = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(2), dp(16), dp(2)) }
+        scrollChips = android.widget.HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            clipToPadding = false
+            addView(filaChips)
         }
-        raiz.addView(selectorGrupo, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
+        raiz.addView(scrollChips, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
 
         estado = TextView(this).apply {
-            setTextColor(0xFFB0B8D0.toInt())
-            textSize = 14f
+            setTextColor(Jtv.TEXTO2)
+            Jtv.sp(this, 14f)
             gravity = Gravity.CENTER
-            setPadding(0, dp(8), 0, dp(8))
+            setPadding(0, dp(10), 0, dp(10))
             visibility = View.GONE
         }
         raiz.addView(estado)
 
         lista = ListView(this).apply {
-            adapter = adaptador
             divider = null
-            dividerHeight = dp(6)
-            setOnItemClickListener { _, _, pos, _ -> reproducir(pos) }
+            dividerHeight = dp(8)
+            selector = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
+            clipToPadding = false
+            setPadding(0, dp(8), 0, dp(24))
+            isVerticalScrollBarEnabled = false
+            addHeaderView(armarHero(), null, false)
+            adapter = adaptador
+            setOnItemClickListener { _, _, pos, _ -> reproducir(pos - headerViewsCount) }
+            layoutAnimation = android.view.animation.LayoutAnimationController(
+                android.view.animation.AnimationSet(true).apply {
+                    addAnimation(android.view.animation.AlphaAnimation(0f, 1f))
+                    addAnimation(android.view.animation.TranslateAnimation(0f, 0f, dp(18).toFloat(), 0f))
+                    duration = 360
+                    interpolator = android.view.animation.DecelerateInterpolator(1.6f)
+                }, 0.08f)
         }
-        raiz.addView(lista, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(4) })
+        raiz.addView(lista, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(2) })
 
         setContentView(raiz)
+        Jtv.aparecer(cabecera)
     }
 
-    private fun boton(texto: String) = Button(this).apply {
-        text = texto
-        isAllCaps = false
-        setTextColor(FONDO)
-        background = redondo(ACENTO)
-        minWidth = 0
-        minimumWidth = 0
-        setPadding(dp(14), 0, dp(14), 0)
-        layoutParams = LinearLayout.LayoutParams(-2, dp(40)).apply { marginStart = dp(8) }
+    /** Banner principal: el banner oficial de JTV + "Seguir viendo" con el último canal. */
+    private fun armarHero(): View {
+        val tarjeta = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = Jtv.forma(this@MainActivity, 22f, 20f, intArrayOf(Jtv.SUPERFICIE2, Jtv.NAVY), Jtv.LINEA, 1.2f)
+            clipToOutline = true
+        }
+        val imagen = object : ImageView(this) {
+            override fun onMeasure(w: Int, h: Int) {
+                val ancho = View.MeasureSpec.getSize(w)
+                setMeasuredDimension(ancho, (ancho * 9 / 16).coerceAtMost(dp(260)))
+            }
+        }.apply {
+            setImageResource(R.drawable.jtv_banner)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            contentDescription = "JTV"
+        }
+        val marco = android.widget.FrameLayout(this)
+        marco.addView(imagen)
+        // suave fundido del banner hacia la tarjeta
+        marco.addView(View(this).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x00000000, 0x00000000, Jtv.conAlfa(Jtv.SUPERFICIE2, 0.95f)))
+        }, android.widget.FrameLayout.LayoutParams(-1, -1))
+        tarjeta.addView(marco)
+
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(4), dp(18), dp(18))
+        }
+        heroEtiqueta = Jtv.etiqueta(this, "Seguir viendo")
+        info.addView(heroEtiqueta)
+        heroNombre = Jtv.titular(this, "", 22f).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+        info.addView(heroNombre, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        info.addView(Jtv.acento(this), LinearLayout.LayoutParams(dp(44), dp(3)).apply { topMargin = dp(8) })
+        val botones = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        heroBoton = Jtv.botonPrimario(this, "▶  Ver ahora") { verUltimo() }
+        botones.addView(heroBoton, LinearLayout.LayoutParams(0, -2, 1f))
+        botones.addView(Jtv.botonSecundario(this, "★  Favoritos") { elegirGrupo(1) },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
+        info.addView(botones, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
+        tarjeta.addView(info)
+
+        val envoltura = android.widget.FrameLayout(this).apply { setPadding(0, 0, 0, dp(14)) }
+        envoltura.addView(tarjeta)
+        Jtv.sombraAzul(tarjeta, 10f)
+        Jtv.aparecer(tarjeta, 120)
+        return envoltura
     }
 
-    private fun redondo(color: Int) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = dp(10).toFloat()
+    /** Actualiza el banner principal con el último canal visto. */
+    private fun pintarHero() {
+        if (!::heroNombre.isInitialized) return
+        val u = Datos.ultimo(this)
+        val c = canales.firstOrNull { it.url == u }
+        if (c != null) {
+            heroEtiqueta.text = "SEGUIR VIENDO"
+            heroNombre.text = c.nombre
+            heroBoton.text = "▶  Ver ahora"
+        } else {
+            heroEtiqueta.text = "BIENVENIDO A JTV"
+            heroNombre.text = if (canales.isEmpty()) "Carga tu lista de canales" else "${canales.size} canales en vivo"
+            heroBoton.text = "▶  Empezar"
+        }
+    }
+
+    private fun verUltimo() {
+        if (canales.isEmpty()) { menuListas(heroBoton); return }
+        val u = Datos.ultimo(this)
+        val visibles = canales.filter { !(Datos.ocultarCaidos(this) && caidos.contains(it.url)) }
+        val i = visibles.indexOfFirst { it.url == u }.coerceAtLeast(0)
+        if (visibles.isEmpty()) return
+        Reproduccion.canales = visibles
+        Reproduccion.inicio = i
+        startActivity(Intent(this, PlayerActivity::class.java))
+    }
+
+    private fun pintarChips() {
+        filaChips.removeAllViews()
+        grupos.forEachIndexed { i, g ->
+            val nombre = when (g) { TODOS -> "Todos"; else -> g }
+            filaChips.addView(Jtv.chip(this, nombre, i == grupoSel) { elegirGrupo(i) },
+                LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) })
+        }
+    }
+
+    private fun elegirGrupo(i: Int) {
+        if (i !in grupos.indices) return
+        grupoSel = i
+        for (k in 0 until filaChips.childCount) {
+            val v = filaChips.getChildAt(k) as TextView
+            Jtv.pintarChip(v, k == i)
+            if (k == i) { Jtv.pop(v); scrollChips.smoothScrollTo((v.left - dp(24)).coerceAtLeast(0), 0) }
+        }
+        filtrar()
+        lista.scheduleLayoutAnimation()
     }
 
     private fun mensaje(texto: String?) {
@@ -350,7 +450,7 @@ class MainActivity : Activity() {
 
     private fun menuMas(ancla: View) {
         val menu = PopupMenu(this, ancla)
-        menu.menu.add(0, 8, 0, "🚗 Poner TV JAT Video en el carro")
+        menu.menu.add(0, 8, 0, "🚗 Poner JTV Video en el carro")
         menu.menu.add(0, 9, 0, "🎤 Activar micrófono del carro")
         menu.menu.add(0, 5, 0, "🩺 Revisar qué canales funcionan")
         menu.menu.add(0, 6, 0, if (Datos.ocultarCaidos(this)) "👁 Mostrar también los que no funcionan"
@@ -381,17 +481,17 @@ class MainActivity : Activity() {
                 9 -> try {
                     startActivity(Intent().setClassName("ec.jat.tv.video", "ec.jat.tv.PermisosActivity"))
                 } catch (e: Exception) {
-                    // TV JAT Video viejo (sin esta pantalla): abrir sus ajustes para dar el permiso a mano
+                    // JTV Video viejo (sin esta pantalla): abrir sus ajustes para dar el permiso a mano
                     try {
                         startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                             android.net.Uri.parse("package:ec.jat.tv.video")))
                         aviso("En Permisos → Micrófono → Permitir")
-                    } catch (e2: Exception) { aviso("Primero instala TV JAT Video: ⋮ → Poner TV JAT Video en el carro") }
+                    } catch (e2: Exception) { aviso("Primero instala JTV Video: ⋮ → Poner JTV Video en el carro") }
                 }
                 8 -> {
                     val e = InstaladorVideo.estado(this)
-                    if (e.lista) AlertDialog.Builder(this).setTitle("🚗 TV JAT Video")
-                        .setMessage("Ya está bien instalada (como de Google Play). Debe salir en el carro como la claqueta roja.\n\n" +
+                    if (e.lista) AlertDialog.Builder(this).setTitle("🚗 JTV Video")
+                        .setMessage("Ya está bien instalada (como de Google Play). Debe salir en el carro con el ícono violeta de JTV.\n\n" +
                             "¿Quieres reinstalarla igual (por ejemplo, para actualizarla)?")
                         .setPositiveButton("Reinstalar") { _, _ -> descargarEInstalarVideo() }
                         .setNegativeButton("No", null).show()
@@ -402,7 +502,7 @@ class MainActivity : Activity() {
                     filtrar()
                 }
                 4 -> AlertDialog.Builder(this)
-                    .setTitle("TV JAT")
+                    .setTitle("JTV")
                     .setMessage("Reproductor de listas M3U.\n\n" +
                         "Respaldo automático en Descargas/TVJAT/${Datos.NOMBRE_RESPALDO} " +
                         "(lista, favoritos y último canal).\n\nVersión " +
@@ -417,7 +517,7 @@ class MainActivity : Activity() {
 
     /** Muestra lo que pasó en Android Auto (para saber qué falla) y deja compartirlo. */
     private fun verDiagnostico() {
-        val texto = "TV JAT " + packageManager.getPackageInfo(packageName, 0).versionName + "\n" +
+        val texto = "JTV " + packageManager.getPackageInfo(packageName, 0).versionName + "\n" +
             InstaladorVideo.resumen(this) + "\n\n" + Registro.leer(this)
         val vista = TextView(this).apply {
             text = texto
@@ -472,7 +572,7 @@ class MainActivity : Activity() {
         when (requestCode) {
             PEDIR_PERMISO_INSTALAR -> {
                 if (android.os.Build.VERSION.SDK_INT >= 26 && packageManager.canRequestPackageInstalls()) instalarVideo()
-                else aviso("Falta activar el permiso para que TV JAT pueda instalar")
+                else aviso("Falta activar el permiso para que JTV pueda instalar")
                 return
             }
             PEDIR_DESINSTALAR -> {
@@ -568,9 +668,11 @@ class MainActivity : Activity() {
         ponerTitulo()
         val nombresGrupo = canales.flatMap { it.grupo.split(';') }
             .map { it.trim() }.filter { it.isNotEmpty() }.distinct().sorted()
+        val anterior = grupos.getOrNull(grupoSel)
         grupos = listOf(TODOS, FAVORITOS) + nombresGrupo
-        selectorGrupo.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, grupos)
-        selectorGrupo.visibility = View.VISIBLE
+        grupoSel = grupos.indexOf(anterior).coerceAtLeast(0)
+        pintarChips()
+        pintarHero()
         filtrar()
     }
 
@@ -610,7 +712,7 @@ class MainActivity : Activity() {
 
     private fun filtrar() {
         val q = buscar.text.toString().trim().lowercase()
-        val g = grupos.getOrNull(selectorGrupo.selectedItemPosition) ?: TODOS
+        val g = grupos.getOrNull(grupoSel) ?: TODOS
         val ocultar = Datos.ocultarCaidos(this)
         filtrados = canales.filter { c ->
             !(ocultar && caidos.contains(c.url)) &&
@@ -637,7 +739,7 @@ class MainActivity : Activity() {
         startActivity(Intent(this, PlayerActivity::class.java))
     }
 
-    // ---------------- filas de la lista ----------------
+    // ---------------- filas de la lista (tarjetas JTV) ----------------
     private inner class Adaptador : BaseAdapter() {
         override fun getCount() = filtrados.size
         override fun getItem(p: Int) = filtrados[p]
@@ -646,54 +748,71 @@ class MainActivity : Activity() {
         override fun getView(p: Int, convertView: View?, parent: ViewGroup?): View {
             val fila = (convertView as? LinearLayout) ?: crearFila()
             val c = filtrados[p]
-            val logo = fila.getChildAt(0) as ImageView
+            val logo = (fila.getChildAt(0) as android.widget.FrameLayout).getChildAt(0) as ImageView
             val textos = fila.getChildAt(1) as LinearLayout
             val estrella = fila.getChildAt(2) as TextView
             val caido = caidos.contains(c.url)
-            (textos.getChildAt(0) as TextView).text =
-                (if (caido) "✖ " else if (c.url == Datos.ultimo(this@MainActivity)) "▶ " else "") + c.nombre
+            val viendo = c.url == Datos.ultimo(this@MainActivity)
+            (textos.getChildAt(0) as TextView).text = (if (caido) "✖ " else "") + c.nombre
             fila.alpha = if (caido) 0.45f else 1f
-            val sub = textos.getChildAt(1) as TextView
-            sub.text = if (caido) "No responde (última revisión)" else c.grupo
-            sub.visibility = if (sub.text.isEmpty()) View.GONE else View.VISIBLE
+            val sub = textos.getChildAt(1) as LinearLayout
+            val subTexto = sub.getChildAt(1) as TextView
+            sub.getChildAt(0).visibility = if (viendo && !caido) View.VISIBLE else View.GONE
+            subTexto.text = if (caido) "No responde (última revisión)" else c.grupo.replace(";", " · ")
+            subTexto.visibility = if (subTexto.text.isEmpty()) View.GONE else View.VISIBLE
+            (fila.background as? Jtv.Forma)?.let { f ->
+                f.borde = if (viendo) Jtv.ELECTRICO else Jtv.LINEA
+                f.colores = if (viendo) intArrayOf(0xFF1A2A78.toInt(), Jtv.SUPERFICIE) else Jtv.TARJETA
+            }
             Logos.poner(logo, c.logo)
             val fav = favoritos.contains(c.url)
             estrella.text = if (fav) "★" else "☆"
-            estrella.setTextColor(if (fav) 0xFFFFC94D.toInt() else 0xFF7A84A6.toInt())
+            estrella.setTextColor(if (fav) Jtv.ORO else Jtv.TEXTO3)
             estrella.setOnClickListener {
+                Jtv.pop(estrella)
                 Datos.cambiarFavorito(this@MainActivity, c.url)
                 favoritos = Datos.favoritos(this@MainActivity)
-                filtrar()
+                estrella.postDelayed({ filtrar() }, 220)
             }
             return fila
         }
 
         private fun crearFila(): LinearLayout {
-            val fila = LinearLayout(this@MainActivity).apply {
+            val ctx = this@MainActivity
+            val fila = LinearLayout(ctx).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                background = redondo(TARJETA)
-                setPadding(dp(10), dp(8), dp(4), dp(8))
+                background = Jtv.forma(ctx, 16f, 12f, Jtv.TARJETA, Jtv.LINEA, 1f)
+                foreground = android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(Jtv.conAlfa(Jtv.CIELO, 0.25f)), null,
+                    (background as Jtv.Forma).copia())
+                setPadding(dp(10), dp(10), dp(4), dp(10))
                 descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             }
-            fila.addView(ImageView(this@MainActivity).apply {
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                background = redondo(0xFF2A3156.toInt())
-                setPadding(dp(4), dp(4), dp(4), dp(4))
-            }, LinearLayout.LayoutParams(dp(56), dp(42)))
-            val textos = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(12), 0, dp(4), 0)
+            val caja = android.widget.FrameLayout(ctx).apply {
+                background = Jtv.forma(ctx, 12f, 8f, intArrayOf(0xFF1B2766.toInt(), 0xFF0E1745.toInt()))
+                clipToOutline = true
+                setPadding(dp(6), dp(6), dp(6), dp(6))
             }
-            textos.addView(TextView(this@MainActivity).apply {
-                setTextColor(Color.WHITE); textSize = 16f; maxLines = 2
+            caja.addView(ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER }, android.widget.FrameLayout.LayoutParams(-1, -1))
+            fila.addView(caja, LinearLayout.LayoutParams(dp(64), dp(48)))
+            val textos = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(14), 0, dp(4), 0)
+            }
+            textos.addView(TextView(ctx).apply {
+                setTextColor(Color.WHITE); Jtv.sp(this, 16f); maxLines = 2
+                typeface = Jtv.titulo(ctx)
             })
-            textos.addView(TextView(this@MainActivity).apply {
-                setTextColor(0xFF8F98B8.toInt()); textSize = 12f; maxLines = 1
-            })
+            val sub = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            sub.addView(Jtv.insigniaVivo(ctx, chica = true).apply { text = "▶ VIENDO" },
+                LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+            sub.addView(TextView(ctx).apply { setTextColor(Jtv.TEXTO3); Jtv.sp(this, 12.5f); maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END })
+            textos.addView(sub, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
             fila.addView(textos, LinearLayout.LayoutParams(0, -2, 1f))
-            fila.addView(TextView(this@MainActivity).apply {
-                textSize = 26f
+            fila.addView(TextView(ctx).apply {
+                Jtv.sp(this, 26f)
                 gravity = Gravity.CENTER
                 isClickable = true
                 isFocusable = true

@@ -100,10 +100,10 @@ import android.view.WindowManager
 import ec.jat.tv.video.R
 
 /**
- * TV JAT Video: canales y Mis Películas CON IMAGEN en la pantalla del carro (Android Auto).
+ * JTV Video: canales y Mis Películas CON IMAGEN en la pantalla del carro (Android Auto).
  *
  * Funciona como lo hace Fermata Auto: Android Auto le presta a las apps de "navegación" una
- * pantalla libre (la que usan para dibujar el mapa); TV JAT dibuja ahí el video.
+ * pantalla libre (la que usan para dibujar el mapa); JTV dibuja ahí el video.
  * Requisito en el celular: Android Auto → Ajustes para desarrolladores → "Fuentes desconocidas".
  *
  * Seguridad: con el GPS del celular se sabe si el carro avanza. Mientras avanza, la imagen se
@@ -123,7 +123,7 @@ class SesionVideo : Session() {
         if (!Puente.hayTvJat(carContext)) {
             return SinTvJat(carContext)
         }
-        Registro.anotar(carContext, "🖼️ TV JAT Video abierto en el carro (nivel ${carContext.carAppApiLevel})")
+        Registro.anotar(carContext, "🖼️ JTV Video abierto en el carro (nivel ${carContext.carAppApiLevel})")
         val tv = VideoCarro(carContext)
         tv.arrancar()
         lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -404,7 +404,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         return lista.filter { it.url in fav }
     }
 
-    /** Hay lista cargada en TV JAT (aunque no haya favoritos). */
+    /** Hay lista cargada en JTV (aunque no haya favoritos). */
     private fun hayLista(): Boolean = cache.isNotEmpty() || (Datos.textoLista(ctx)?.isNotBlank() == true)
 
     fun grupoDe(c: Canal) = c.grupo.ifBlank { "Otros" }
@@ -440,13 +440,13 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         alCambiar?.invoke()
     }
 
-    /** Al abrir TV JAT Video: sigue en el último canal que vio. */
+    /** Al abrir JTV Video: sigue en el último canal que vio. */
     fun empezar() {
         if (player.mediaItemCount > 0) return
         val todos = canales()
         if (todos.isEmpty()) {
-            ponerAviso(if (hayLista()) "No tienes canales favoritos.\nEn TV JAT del celular toca la ★ de los canales que quieras ver aquí."
-                       else "No hay lista de canales.\nAbre TV JAT en el celular y carga una lista.")
+            ponerAviso(if (hayLista()) "No tienes canales favoritos.\nEn JTV del celular toca la ★ de los canales que quieras ver aquí."
+                       else "No hay lista de canales.\nAbre JTV en el celular y carga una lista.")
             return
         }
         val i = todos.indexOfFirst { it.url == Datos.ultimo(ctx) }.coerceAtLeast(0)
@@ -533,9 +533,9 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             directa = true; dForma = "directa (automática)"
         } else try {
             val dm = ctx.getSystemService(DisplayManager::class.java)
-            val d = dm.createVirtualDisplay("TV JAT Video", sc.width, sc.height, sc.dpi, s, 0)
+            val d = dm.createVirtualDisplay("JTV Video", sc.width, sc.height, sc.dpi, s, 0)
             vd = d
-            val p = Presentation(ctx, d.display, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+            val p = Presentation(ctx, d.display, R.style.Jtv_Pantalla)
             p.window?.setFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED, WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
             p.setContentView(armarVista(p.context))
             p.show()
@@ -588,8 +588,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val t = TextView(c).apply {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            setTypeface(typeface, Typeface.BOLD)
-            background = redondo(0xB3000000.toInt(), dp(c, 8).toFloat())
+            typeface = Jtv.titulo(c)
+            background = Jtv.forma(c, 12f, 9f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.85f), Jtv.conAlfa(Jtv.NAVY, 0.85f)), Jtv.LINEA, 1f)
             setPadding(dp(c, 14), dp(c, 8), dp(c, 14), dp(c, 8))
             visibility = View.GONE
         }
@@ -598,8 +598,9 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             gravity = Gravity.CENTER
-            background = redondo(0xCC000000.toInt(), dp(c, 12).toFloat())
-            setPadding(dp(c, 20), dp(c, 14), dp(c, 20), dp(c, 14))
+            typeface = Jtv.titulo(c)
+            background = Jtv.forma(c, 18f, 14f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.92f), Jtv.conAlfa(Jtv.NAVY, 0.92f)), Jtv.LINEA, 1.2f)
+            setPadding(dp(c, 24), dp(c, 16), dp(c, 24), dp(c, 16))
             visibility = View.GONE
         }
         raiz.addView(a, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
@@ -684,14 +685,15 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     }
 
     // ------------------------------------------------------------------ interfaz sobre el video
-    // Diseño: barra de arriba (Canales · Películas · TV JAT · 🔍), lista de canales a la derecha,
+    // Diseño: barra de arriba (Canales · Películas · JTV · 🔍), lista de canales a la derecha,
     // botones redondos abajo (Guía · Anterior · Pausa · Siguiente · Cerrar TV) y barra de información
     // (canal, avance/colchón, EN VIVO, Ajustes, Calidad).
-    private val AZUL_SEL = 0xFF1F3B5E.toInt()
-    private val ACENTO = 0xFF2F8BFF.toInt()
-    private val ROJO = 0xFFE53935.toInt()
-    private val GRIS = 0xFFB4BAC2.toInt()
-    private val BOTON = 0xCC3A3F47.toInt()
+    // colores de JTV (los mismos del celular)
+    private val AZUL_SEL = 0xFF1A2A78.toInt()
+    private val ACENTO = Jtv.CIELO
+    private val ROJO = Jtv.VIVO
+    private val GRIS = Jtv.TEXTO2
+    private val BOTON = Jtv.conAlfa(Jtv.SUPERFICIE2, 0.85f)
 
     private var raizVista: FrameLayout? = null
     private var capa: FrameLayout? = null
@@ -763,8 +765,10 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         text = txt
         setTextColor(Color.WHITE)
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-        setPadding(dp(c, 12), dp(c, 6), dp(c, 12), dp(c, 6))
+        typeface = Jtv.textoFuerte(c)
+        setPadding(dp(c, 14), dp(c, 7), dp(c, 14), dp(c, 7))
         setOnClickListener { accion(); tocado() }
+        Jtv.vivo(this, 0.92f, Jtv.forma(c, 12f, 8f, intArrayOf(Color.WHITE)))
     }
 
     private class Boton(val vista: LinearLayout, val icono: ImageView?, val texto: TextView)
@@ -776,23 +780,34 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             gravity = Gravity.CENTER_HORIZONTAL
             setOnClickListener { accion(); tocado() }
         }
-        val circulo = FrameLayout(c).apply { background = redondo(fondo) }
+        // botones con la forma JTV: el principal con el degradado de la marca, cerrar en rojo, el resto de vidrio azul
+        val circulo = FrameLayout(c).apply {
+            background = when (fondo) {
+                Color.WHITE -> Jtv.forma(c, tam * 0.32f, tam * 0.22f, Jtv.MARCA)
+                ROJO -> Jtv.forma(c, tam * 0.32f, tam * 0.22f, intArrayOf(Jtv.VIVO, 0xFFB81E4E.toInt()))
+                else -> Jtv.forma(c, tam * 0.32f, tam * 0.22f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.88f), Jtv.conAlfa(Jtv.NAVY, 0.88f)), Jtv.LINEA, 1.2f)
+            }
+        }
+        val tinteReal = if (fondo == Color.WHITE) Color.WHITE else tinte
         var img: ImageView? = null
         if (icono != 0) {
-            img = ImageView(c).apply { setImageResource(icono); setColorFilter(tinte) }
+            img = ImageView(c).apply { setImageResource(icono); setColorFilter(tinteReal) }
             val m = tam / 4
             circulo.addView(img, FrameLayout.LayoutParams(dp(c, tam - 2 * m), dp(c, tam - 2 * m), Gravity.CENTER))
         } else {
             circulo.addView(TextView(c).apply {
-                text = glifo; setTextColor(tinte); gravity = Gravity.CENTER
+                text = glifo; setTextColor(tinteReal); gravity = Gravity.CENTER
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, tam * 0.42f)
-                setTypeface(typeface, Typeface.BOLD)
+                typeface = Jtv.titulo(c)
             }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }
         caja.addView(circulo, LinearLayout.LayoutParams(dp(c, tam), dp(c, tam)))
+        Jtv.vivo(circulo, 0.9f)
+        circulo.setOnClickListener { accion(); tocado() }
         val t = TextView(c).apply {
-            text = etiqueta; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            text = etiqueta; setTextColor(Jtv.HIELO); gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
+            typeface = Jtv.textoFuerte(c)
             setShadowLayer(4f, 0f, 1f, Color.BLACK)
             setPadding(0, dp(c, 3), 0, 0)
         }
@@ -806,6 +821,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             gravity = Gravity.CENTER
             setPadding(dp(c, 10), dp(c, 2), dp(c, 10), dp(c, 2))
             setOnClickListener { accion(); tocado() }
+            Jtv.vivo(this, 0.9f, Jtv.forma(c, 12f, 8f, intArrayOf(Color.WHITE)))
         }
         caja.addView(TextView(c).apply { text = glifo; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f) })
         val t = TextView(c).apply { text = etiqueta; setTextColor(GRIS); gravity = Gravity.CENTER; setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f) }
@@ -823,35 +839,35 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val arriba = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = degradado(true, 0xDD000000.toInt())
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Jtv.conAlfa(Jtv.NEGRO, 0.92f), Jtv.conAlfa(Jtv.NAVY, 0.55f), 0x00000000))
             setPadding(dp(c, 8), 0, dp(c, 8), 0)
             setOnClickListener { tocado() }
         }
         val cc = chip(c, "📺 Canales") { panelVista = "canales"; pintarPanel() }
         val cpel = chip(c, "🎬 Películas") { panelVista = if (carpetaSel.isNotEmpty() && modo == Modo.PELICULAS) "carpeta" else "pelis"; pintarPanel() }
         arriba.addView(cc); arriba.addView(cpel)
-        arriba.addView(TextView(c).apply {
-            text = "TV JAT"; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f); setTypeface(typeface, Typeface.BOLD)
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        // logo oficial de JTV al centro
+        val centroLogo = FrameLayout(c)
+        centroLogo.addView(Jtv.logo(c, 28), FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(c, 28), Gravity.CENTER))
+        arriba.addView(centroLogo, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
         arriba.addView(chip(c, "🎤 Voz") { buscarPorVoz() }.apply {
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f); setTypeface(typeface, Typeface.BOLD)
-            background = redondo(ROJO, 40f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f); typeface = Jtv.titulo(c)
+            background = Jtv.forma(c, 14f, 10f, Jtv.MARCA)
         })
         cp.addView(arriba, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, 50), Gravity.TOP))
 
         // ---- lista al costado derecho
         val pn = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            background = redondo(0xE6151920.toInt(), dp(c, 10).toFloat())
+            background = Jtv.forma(c, 18f, 14f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.93f), Jtv.conAlfa(Jtv.NAVY, 0.95f)), Jtv.LINEA, 1.2f)
             clipToOutline = true
             setOnClickListener { tocado() }
         }
         val tt = TextView(c).apply {
             setTextColor(ACENTO)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            setTypeface(typeface, Typeface.BOLD)
-            setPadding(dp(c, 12), dp(c, 8), dp(c, 12), dp(c, 6))
+            typeface = Jtv.titulo(c)
+            setPadding(dp(c, 16), dp(c, 12), dp(c, 14), dp(c, 8))
             setOnClickListener {
                 panelVista = when (panelVista) { "canales" -> "grupos"; "carpeta" -> "pelis"; "grupos" -> "canales"; else -> panelVista }
                 pintarPanel(); tocado()
@@ -874,7 +890,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val controles = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = degradado(false, 0xAA000000.toInt())
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x00000000, Jtv.conAlfa(Jtv.NAVY, 0.55f), Jtv.conAlfa(Jtv.NEGRO, 0.85f)))
             setPadding(dp(c, 8), dp(c, 10), dp(c, 8), dp(c, 6))
         }
         val lpB = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -889,8 +905,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val info = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(0xF0121519.toInt())
-            setPadding(dp(c, 16), dp(c, 6), dp(c, 6), dp(c, 6))
+            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(Jtv.conAlfa(Jtv.NAVY, 0.97f), Jtv.conAlfa(0xFF0F1A52.toInt(), 0.97f), Jtv.conAlfa(Jtv.NAVY, 0.97f)))
+            setPadding(dp(c, 16), dp(c, 8), dp(c, 8), dp(c, 8))
         }
         val est = TextView(c).apply {
             text = "☆"; gravity = Gravity.CENTER
@@ -900,7 +916,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         info.addView(est, LinearLayout.LayoutParams(dp(c, 40), dp(c, 40)).apply { rightMargin = dp(c, 8) })
         val izq = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
         val nom = TextView(c).apply {
-            setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 19f); setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 19f); typeface = Jtv.titulo(c)
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END
         }
         val sub = TextView(c).apply {
@@ -923,7 +939,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val tiempo = TextView(c).apply { setTextColor(GRIS); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); maxLines = 1 }
         filaT.addView(tiempo, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         val vivo = TextView(c).apply {
-            text = "● EN VIVO"; setTextColor(ROJO); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTypeface(typeface, Typeface.BOLD)
+            text = "● EN VIVO"; setTextColor(ROJO); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); typeface = Jtv.titulo(c)
             setPadding(dp(c, 6), dp(c, 2), dp(c, 2), dp(c, 2))
             setOnClickListener { irAlDirecto(); tocado() }
         }
@@ -960,8 +976,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         lblSig?.text = if (pelis) "+30 s" else "Siguiente"
         val enPelis = panelVista == "pelis" || panelVista == "carpeta"
         val enCanales = panelVista == "canales" || panelVista == "grupos"
-        chipCanales?.background = if (enCanales) redondo(AZUL_SEL, 40f) else null
-        chipPelis?.background = if (enPelis) redondo(AZUL_SEL, 40f) else null
+        chipCanales?.let { it.background = if (enCanales) Jtv.forma(it.context, 12f, 8f, intArrayOf(AZUL_SEL, Jtv.conAlfa(Jtv.INDIGO, 0.7f)), Jtv.LINEA, 1f) else null }
+        chipPelis?.let { it.background = if (enPelis) Jtv.forma(it.context, 12f, 8f, intArrayOf(AZUL_SEL, Jtv.conAlfa(Jtv.INDIGO, 0.7f)), Jtv.LINEA, 1f) else null }
         val i = player.currentMediaItemIndex
         if (pelis) {
             val p = pelisLista.getOrNull(i)
@@ -998,8 +1014,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             infoVivo?.text = "● EN VIVO"
             infoVivo?.visibility = View.VISIBLE
         } else {
-            br?.colorRelleno = ROJO
-            br?.colorGuardado = 0x66FFFFFF
+            br?.colorRelleno = Jtv.ELECTRICO
+            br?.colorGuardado = 0x55FFFFFF
             br?.guardado = if (dur > 0) player.bufferedPosition.toFloat() / dur else 0f
             br?.avance = if (dur > 0) pos.toFloat() / dur else 0f
             infoTiempo?.text = if (dur > 0) "${hms(pos)} / ${hms(dur)}" else hms(pos)
@@ -1014,8 +1030,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 est.visibility = View.VISIBLE
                 val fav = cAct.url in favoritos()
                 est.text = if (fav) "★" else "☆"
-                est.setTextColor(if (fav) 0xFF3A2A00.toInt() else GRIS)
-                est.background = if (fav) redondo(0xFFF5B301.toInt()) else GradientDrawable().apply {
+                est.setTextColor(if (fav) 0xFF2A1F00.toInt() else GRIS)
+                est.background = if (fav) Jtv.forma(est.context, 12f, 8f, intArrayOf(Jtv.ORO, 0xFFFF9F2E.toInt())) else GradientDrawable().apply {
                     shape = GradientDrawable.OVAL; setStroke(dp(est.context, 2), GRIS)
                 }
             }
@@ -1052,13 +1068,16 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(cx, 10), dp(cx, 8), dp(cx, 10), dp(cx, 8))
-            if (marcada) setBackgroundColor(AZUL_SEL)
+            if (marcada) background = Jtv.forma(cx, 12f, 9f, intArrayOf(AZUL_SEL, Jtv.conAlfa(Jtv.INDIGO, 0.6f)), Jtv.ELECTRICO, 1.6f)
             setOnClickListener { accion(); tocado() }
         }
-        val caja = FrameLayout(cx).apply { background = redondo(0xFF0D1F4A.toInt(), dp(cx, 6).toFloat()); clipToOutline = true }
+        val caja = FrameLayout(cx).apply {
+            background = Jtv.forma(cx, 10f, 7f, intArrayOf(0xFF1B2766.toInt(), 0xFF0E1745.toInt())); clipToOutline = true
+            setPadding(dp(cx, 3), dp(cx, 3), dp(cx, 3), dp(cx, 3))
+        }
         caja.addView(TextView(cx).apply {
             text = iniciales(c.nombre); setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); typeface = Jtv.titulo(cx)
         }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         val img = ImageView(cx).apply { scaleType = ImageView.ScaleType.FIT_CENTER; tag = c }
         caja.addView(img, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -1067,26 +1086,26 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         textos.addView(TextView(cx).apply {
             text = "$n. " + (if (fav) "★ " else "") + c.nombre
             setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-            if (marcada) setTypeface(typeface, Typeface.BOLD)
+            typeface = if (marcada) Jtv.titulo(cx) else Jtv.texto(cx)
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END
         })
         textos.addView(TextView(cx).apply {
-            text = "EN VIVO"; setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-            setTypeface(typeface, Typeface.BOLD)
-            background = redondo(if (marcada) ROJO else 0xFF8E2A28.toInt(), dp(cx, 3).toFloat())
+            text = "● EN VIVO"; setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f)
+            typeface = Jtv.titulo(cx); letterSpacing = 0.06f
+            background = Jtv.forma(cx, 4f, 3f, if (marcada) intArrayOf(Jtv.VIVO, 0xFFE0305F.toInt()) else intArrayOf(0xFF7A2346.toInt()))
             setPadding(dp(cx, 6), dp(cx, 1), dp(cx, 6), dp(cx, 1))
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(cx, 3) })
         f.addView(textos, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         ll.addView(f)
         filasAccion.add(f to accion)
         if (marcada) {
-            ll.addView(View(cx).apply { setBackgroundColor(ACENTO) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(cx, 3)))
+            ll.addView(View(cx), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(cx, 3)))
             filaMarcada = f
-        } else ll.addView(View(cx).apply { setBackgroundColor(0x1FFFFFFF) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
+        } else ll.addView(View(cx).apply { setBackgroundColor(Jtv.conAlfa(Jtv.CIELO, 0.10f)) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
         filasLogo.add(f to img)
     }
 
-    /** Logos: TV JAT los baja (LogoProvider) y aquí se piden solo los de las filas que se ven. */
+    /** Logos: JTV los baja (LogoProvider) y aquí se piden solo los de las filas que se ven. */
     private fun cargarLogosVisibles() {
         val sv = panelScroll ?: return
         val arriba = sv.scrollY - 300
@@ -1120,17 +1139,17 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             text = if (sub.isEmpty()) texto else "$texto\n$sub"
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-            setTypeface(typeface, if (marcada) Typeface.BOLD else Typeface.NORMAL)
+            typeface = if (marcada) Jtv.titulo(c) else Jtv.texto(c)
             setPadding(dp(c, 14), dp(c, 12), dp(c, 12), dp(c, 12))
-            if (marcada) setBackgroundColor(AZUL_SEL)
+            if (marcada) background = Jtv.forma(c, 12f, 9f, intArrayOf(AZUL_SEL, Jtv.conAlfa(Jtv.INDIGO, 0.6f)), Jtv.ELECTRICO, 1.6f)
             setOnClickListener { accion(); tocado() }
         }
         ll.addView(v)
         filasAccion.add(v to accion)
         if (marcada) {
-            ll.addView(View(c).apply { setBackgroundColor(ACENTO) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, 3)))
+            ll.addView(View(c), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, 3)))
             filaMarcada = v
-        } else ll.addView(View(c).apply { setBackgroundColor(0x1FFFFFFF) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
+        } else ll.addView(View(c).apply { setBackgroundColor(Jtv.conAlfa(Jtv.CIELO, 0.10f)) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
     }
 
     fun pintarPanel() {
@@ -1212,7 +1231,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 lista.take(500).forEachIndexed { i, c ->
                     filaCanal(i + 1, c, c.url == actual, c.url in fav) { ponerCanales(lista, i); pintarPanel() }
                 }
-                if (lista.isEmpty()) fila("No tienes canales favoritos", "En TV JAT del celular toca la ★ de los canales que quieras aquí") {}
+                if (lista.isEmpty()) fila("No tienes canales favoritos", "En JTV del celular toca la ★ de los canales que quieras aquí") {}
             }
         }
         actualizarCapa()
@@ -1265,7 +1284,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     // ------------------------------------------------------------------ favorito con la estrella
     private var estrella: TextView? = null
     private var favMem: Set<String>? = null
-    /** Favoritos guardados en memoria (no se pregunta a TV JAT cada segundo: eso trababa la imagen). */
+    /** Favoritos guardados en memoria (no se pregunta a JTV cada segundo: eso trababa la imagen). */
     private fun favoritos(): Set<String> = favMem ?: Datos.favoritos(ctx).also { favMem = it }
 
     fun esFavoritoActual(): Boolean {
@@ -1322,7 +1341,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     fun buscarPorVoz() {
         if (ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             Registro.anotar(ctx, "   🎤 falta el permiso del micrófono")
-            ponerAviso("🎤 Falta activar el micrófono.\nEn el celular: TV JAT → ⋮ →\n🎤 Activar micrófono del carro")
+            ponerAviso("🎤 Falta activar el micrófono.\nEn el celular: JTV → ⋮ →\n🎤 Activar micrófono del carro")
             main.removeCallbacks(quitarAvisoBreve); main.postDelayed(quitarAvisoBreve, 8000)
             try {
                 ctx.requestPermissions(listOf(Manifest.permission.RECORD_AUDIO)) { ok, _ ->
@@ -1607,7 +1626,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     fun alternarPanel() { if (panelVisible) ocultarPanel() else mostrarPanel() }
 
-    /** Botón "Cerrar TV": guarda, detiene y cierra TV JAT Video en el carro. */
+    /** Botón "Cerrar TV": guarda, detiene y cierra JTV Video en el carro. */
     fun cerrar() {
         guardarAvance(true)
         player.pause()
@@ -1694,7 +1713,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val tapar = enMovimiento && !Datos.modoPasajero(ctx)
         avisoFijo = when {
             !tapar -> ""
-            !tienePermisoGps() -> "🔒 Para ver la imagen, acepta en el celular el permiso de ubicación de TV JAT\n(sirve para tapar la imagen mientras manejas).\nEl sonido sigue."
+            !tienePermisoGps() -> "🔒 Para ver la imagen, acepta en el celular el permiso de ubicación de JTV\n(sirve para tapar la imagen mientras manejas).\nEl sonido sigue."
             else -> "🚗 Imagen en pausa mientras el carro avanza.\nEl sonido sigue. Al detenerte vuelve la imagen."
         }
         // en canales, sin imagen se ahorran datos
@@ -1811,13 +1830,21 @@ class Barra(c: android.content.Context) : View(c) {
         val x0 = r; val x1 = width - r
         p.color = 0x55FFFFFF
         cv.drawRoundRect(x0, mitad - grueso / 2, x1, mitad + grueso / 2, grueso, grueso, p)
+        // los colores de la marca (cielo / eléctrico) se pintan con el degradado de JTV
+        val deg = android.graphics.LinearGradient(x0, 0f, x1, 0f, intArrayOf(Jtv.CIELO, Jtv.ELECTRICO, Jtv.VIOLETA), null, android.graphics.Shader.TileMode.CLAMP)
         if (guardado > 0f) {
             p.color = colorGuardado
+            if (colorGuardado == Jtv.CIELO) p.shader = deg
             cv.drawRoundRect(x0, mitad - grueso / 2, x0 + (x1 - x0) * guardado, mitad + grueso / 2, grueso, grueso, p)
+            p.shader = null
         }
         val xf = x0 + (x1 - x0) * avance
         p.color = colorRelleno
+        if (colorRelleno == Jtv.ELECTRICO) p.shader = deg
         cv.drawRoundRect(x0, mitad - grueso / 2, xf, mitad + grueso / 2, grueso, grueso, p)
+        p.shader = null
+        p.color = Jtv.conAlfa(Jtv.CIELO, 0.35f)
+        cv.drawCircle(xf, mitad, r * 1.45f, p)
         p.color = Color.WHITE
         cv.drawCircle(xf, mitad, r, p)
     }
@@ -1918,7 +1945,7 @@ private fun filasCanales(tv: VideoCarro, lista: List<Canal>): List<Fila> {
     }
 }
 
-class PantallaMenu(ctx: CarContext, tv: VideoCarro) : PantallaFilas(ctx, "TV JAT", {
+class PantallaMenu(ctx: CarContext, tv: VideoCarro) : PantallaFilas(ctx, "JTV", {
     val fav = tv.canales()          // en el carro: solo favoritos
     val l = ArrayList<Fila>()
     l.add(Fila("★ Favoritos", "${fav.size} canales", true) {
@@ -1999,10 +2026,10 @@ class PantallaBuscar(ctx: CarContext, private val tv: VideoCarro) : Screen(ctx) 
     }
 }
 
-/** Si falta la app TV JAT (de ahí salen la lista y los favoritos). */
+/** Si falta la app JTV (de ahí salen la lista y los favoritos). */
 class SinTvJat(ctx: CarContext) : Screen(ctx) {
     override fun onGetTemplate(): Template =
         androidx.car.app.model.MessageTemplate.Builder(
-            "Falta la app TV JAT en el celular (o hay que actualizarla).\nInstala TV JAT, ábrela una vez y carga una lista de canales."
-        ).setTitle("TV JAT Video").build()
+            "Falta la app JTV en el celular (o hay que actualizarla).\nInstala JTV, ábrela una vez y carga una lista de canales."
+        ).setTitle("JTV Video").build()
 }

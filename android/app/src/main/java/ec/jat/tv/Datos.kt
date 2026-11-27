@@ -173,7 +173,7 @@ object Datos {
         val texto = ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
             ?: throw IllegalArgumentException("No se pudo leer el archivo")
         val json = JSONObject(texto)
-        if (json.optString("app") != "TV JAT") throw IllegalArgumentException("Ese archivo no es un respaldo de TV JAT")
+        if (json.optString("app") != "TV JAT") throw IllegalArgumentException("Ese archivo no es un respaldo de JTV")
         val m3u = json.optString("listaM3u", "")
         if (m3u.isNotBlank()) File(ctx.filesDir, ARCHIVO_LISTA).writeText(m3u)
         val previos = favoritos(ctx)

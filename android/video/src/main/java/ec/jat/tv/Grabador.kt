@@ -16,9 +16,9 @@ import kotlin.math.abs
 import kotlin.math.ceil
 
 /**
- * Grabador de TV JAT (celular y carro): la "línea de tiempo".
+ * Grabador de JTV (celular y carro): la "línea de tiempo".
  *
- * Mientras ves un canal (HLS en vivo), TV JAT lo va descargando parte por parte y lo guarda en el celular
+ * Mientras ves un canal (HLS en vivo), JTV lo va descargando parte por parte y lo guarda en el celular
  * (hasta 10 minutos). El video se reproduce desde lo guardado, por un pequeño servidor que solo existe
  * dentro del celular (127.0.0.1). Así:
  *  · si el internet baja un momento, el video sigue con lo grabado (no se corta);

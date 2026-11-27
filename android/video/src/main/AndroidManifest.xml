@@ -13,7 +13,7 @@
     <!-- Búsqueda de canales por voz (micrófono del carro o del celular) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- Lee la lista, favoritos y avance de películas de la app TV JAT -->
+    <!-- Lee la lista, favoritos y avance de películas de la app JTV -->
     <queries>
         <package android:name="ec.jat.tv" />
         <provider android:authorities="ec.jat.tv.datos" />
@@ -25,9 +25,9 @@
 
     <application
         android:icon="@mipmap/ic_launcher"
-        android:label="TV JAT Video"
+        android:label="JTV Video"
         android:usesCleartextTraffic="true"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@style/Jtv">
 
         <meta-data
             android:name="com.google.android.gms.car.application"
@@ -37,16 +37,16 @@
             android:value="1" />
 
         <!-- Canales y películas CON IMAGEN en la pantalla del carro (como Fermata Auto) -->
-        <!-- Permisos (micrófono, ubicación, videos) desde el celular: TV JAT → ⋮ → Activar micrófono del carro -->
+        <!-- Permisos (micrófono, ubicación, videos) desde el celular: JTV → ⋮ → Activar micrófono del carro -->
         <activity
             android:name=".PermisosActivity"
             android:exported="true"
-            android:label="Permisos de TV JAT Video" />
+            android:label="Permisos de JTV Video" />
 
         <service
             android:name="ec.jat.tv.AutoVideoService"
             android:exported="true"
-            android:label="TV JAT Video"
+            android:label="JTV Video"
             android:icon="@mipmap/ic_launcher">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />

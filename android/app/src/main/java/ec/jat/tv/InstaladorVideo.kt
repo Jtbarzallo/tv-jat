@@ -13,11 +13,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Instala "TV JAT Video" de forma que Android Auto SÍ la muestre.
+ * Instala "JTV Video" de forma que Android Auto SÍ la muestre.
  *
  * Por qué hace falta: Android Auto solo muestra las apps hechas con la librería de apps del carro
- * (como TV JAT Video o Fermata Auto) si el celular dice que vinieron de Google Play. El interruptor
- * "Fuentes desconocidas" no basta para ese tipo de app (sí basta para apps de audio como TV JAT).
+ * (como JTV Video o Fermata Auto) si el celular dice que vinieron de Google Play. El interruptor
+ * "Fuentes desconocidas" no basta para ese tipo de app (sí basta para apps de audio como JTV).
  * Instalada desde Chrome queda como "instalada por Chrome" y Android Auto la esconde sin avisar.
  *
  * Aquí se le pide al instalador del sistema que la registre como instalada por Google Play
@@ -61,8 +61,8 @@ object InstaladorVideo {
 
     fun resumen(ctx: Context): String {
         val e = estado(ctx)
-        if (!e.instalada) return "TV JAT Video: no está instalada"
-        return "TV JAT Video: instalada\n  Instalada por: ${nombre(e.instaladoPor)}\n  Pedido por: ${nombre(e.pedidoPor)}\n" +
+        if (!e.instalada) return "JTV Video: no está instalada"
+        return "JTV Video: instalada\n  Instalada por: ${nombre(e.instaladoPor)}\n  Pedido por: ${nombre(e.pedidoPor)}\n" +
             (if (e.lista) "  → Android Auto SÍ la muestra ✅" else "  → Android Auto la esconde ❌")
     }
 

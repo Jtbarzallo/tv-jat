@@ -16,7 +16,7 @@ function crearVentana() {
   Menu.setApplicationMenu(null);
   const win = new BrowserWindow({
     width: 1300, height: 820, minWidth: 900, minHeight: 600,
-    backgroundColor: '#0b0f1a', title: 'TV JAT', icon: path.join(__dirname, 'icono.png'),
+    backgroundColor: '#050a1c', title: 'JTV', icon: path.join(__dirname, 'icono.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

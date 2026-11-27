@@ -29,7 +29,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import java.io.File
 
 /**
- * TV JAT en Android Auto.
+ * JTV en Android Auto.
  * Android Auto no deja ver video en la pantalla del carro (solo apps de audio), así que aquí los
  * canales se ESCUCHAN como si fueran radio: se apaga la imagen y se baja solo el sonido
  * (además así gasta muchos menos datos).
@@ -122,14 +122,14 @@ class AutoService : MediaLibraryService() {
         return b.build()
     }
 
-    private fun raiz(): MediaItem = carpeta(RAIZ, "TV JAT")
+    private fun raiz(): MediaItem = carpeta(RAIZ, "JTV")
 
     private fun hijos(id: String): List<MediaItem> = when {
         id == RAIZ -> {
             // solo favoritos, directo en la primera pantalla
             val fav = contexto(FAVORITOS)
             if (fav.isEmpty()) listOf(carpeta(FAVORITOS, "No tienes canales favoritos",
-                "En TV JAT del celular toca la ★ de los canales que quieras aquí"))
+                "En JTV del celular toca la ★ de los canales que quieras aquí"))
             else fav.map { itemCanal(it, FAVORITOS) }
         }
         id == FAVORITOS || id == TODOS || id.startsWith(GRUPO) -> contexto(id).map { itemCanal(it, id) }
@@ -172,7 +172,7 @@ class AutoService : MediaLibraryService() {
         super.onCreate()
         instancia = this
         Registro.instalar(this)
-        Registro.anotar(this, "🚗 Servicio de audio (TV JAT) iniciado. Canales en la lista: ${canales().size} · favoritos en el carro: ${contexto(FAVORITOS).size}")
+        Registro.anotar(this, "🚗 Servicio de audio (JTV) iniciado. Canales en la lista: ${canales().size} · favoritos en el carro: ${contexto(FAVORITOS).size}")
         val http = DefaultHttpDataSource.Factory()
             .setUserAgent(Reproduccion.USER_AGENT)
             .setAllowCrossProtocolRedirects(true)
@@ -335,7 +335,7 @@ class AutoService : MediaLibraryService() {
             probadosHls.clear(); errorSeguidos = 0
             Registro.anotar(this@AutoService, "👆 ${controller.packageName} pidió: " + mediaItems.joinToString { it.mediaId.substringAfterLast(SEP).ifEmpty { it.requestMetadata.searchQuery ?: "?" } })
             if (mediaItems.size == 1) {
-                // "Ok Google, pon Ecuavisa en TV JAT"
+                // "Ok Google, pon Ecuavisa en JTV"
                 val consulta = mediaItems[0].requestMetadata.searchQuery
                 if (consulta != null) {
                     var lista = buscar(consulta)

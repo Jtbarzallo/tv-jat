@@ -168,7 +168,7 @@ object Peliculas {
         Datos.guardarRespaldo(ctx)
     }
 
-    /** Lo guarda TV JAT Video (desde el carro). */
+    /** Lo guarda JTV Video (desde el carro). */
     fun guardarClave(ctx: Context, clave: String, o: JSONObject, forzarRespaldo: Boolean) {
         val todo = progresoJson(ctx)
         todo.put(clave, o)

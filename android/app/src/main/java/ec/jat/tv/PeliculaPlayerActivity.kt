@@ -71,10 +71,19 @@ class PeliculaPlayerActivity : Activity() {
             })
         }
         raiz.addView(vista, FrameLayout.LayoutParams(-1, -1))
+        // barra de avance con los colores de JTV
+        try {
+            vista.findViewById<androidx.media3.ui.DefaultTimeBar>(androidx.media3.ui.R.id.exo_progress)?.apply {
+                setPlayedColor(Jtv.ELECTRICO); setScrubberColor(Jtv.CIELO)
+                setBufferedColor(Jtv.conAlfa(Jtv.CIELO, 0.35f)); setUnplayedColor(0x33FFFFFF)
+            }
+        } catch (e: Exception) {}
 
         titulo = TextView(this).apply {
             setTextColor(Color.WHITE)
             textSize = 17f
+            typeface = Jtv.titulo(this@PeliculaPlayerActivity)
+            setShadowLayer(8f, 0f, 2f, Jtv.NEGRO)
             setPadding(dp(14), dp(8), dp(14), dp(8))
             maxLines = 1
         }
@@ -87,8 +96,10 @@ class PeliculaPlayerActivity : Activity() {
             setTextColor(Color.WHITE)
             textSize = 15f
             setPadding(dp(14), dp(8), dp(14), dp(8))
-            background = GradientDrawable().apply { setColor(0xAA000000.toInt()); cornerRadius = dp(10).toFloat() }
+            typeface = Jtv.textoFuerte(this@PeliculaPlayerActivity)
+            background = Jtv.forma(this@PeliculaPlayerActivity, 14f, 10f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.85f), Jtv.conAlfa(Jtv.NAVY, 0.85f)), Jtv.LINEA, 1.2f)
             setOnClickListener { cambiarTamano() }
+            Jtv.vivo(this)
         }
         raiz.addView(btnTamano, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
             setMargins(dp(16), dp(16), dp(16), 0)
@@ -99,9 +110,11 @@ class PeliculaPlayerActivity : Activity() {
             setTextColor(Color.WHITE)
             textSize = 15f
             setPadding(dp(14), dp(8), dp(14), dp(8))
-            background = GradientDrawable().apply { setColor(0xAA000000.toInt()); cornerRadius = dp(10).toFloat() }
+            typeface = Jtv.textoFuerte(this@PeliculaPlayerActivity)
+            background = Jtv.forma(this@PeliculaPlayerActivity, 14f, 10f, Jtv.MARCA)
             visibility = if (Transmitir.esTv(this@PeliculaPlayerActivity)) View.GONE else View.VISIBLE
             setOnClickListener { Transmitir.elegirTv(this@PeliculaPlayerActivity) { pasarATv() } }
+            Jtv.vivo(this)
         }
         raiz.addView(btnTv, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
             setMargins(dp(16), dp(64), dp(16), 0)
@@ -110,21 +123,22 @@ class PeliculaPlayerActivity : Activity() {
         capaTv = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(0xF20B0B0F.toInt())
+            background = Jtv.Fondo()
             visibility = View.GONE
             isClickable = true
             setPadding(dp(20), dp(20), dp(20), dp(20))
         }
+        capaTv.addView(Jtv.logo(this, 40), LinearLayout.LayoutParams(-2, dp(40)).apply { bottomMargin = dp(18) })
         textoTv = TextView(this).apply {
             setTextColor(Color.WHITE)
             textSize = 20f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            typeface = Jtv.titulo(this@PeliculaPlayerActivity)
             gravity = Gravity.CENTER
         }
         capaTv.addView(textoTv)
         capaTv.addView(TextView(this).apply {
             text = "Puedes apagar la pantalla del celular. Mantén el celular en el mismo WiFi."
-            setTextColor(0xFFB8C0E0.toInt())
+            setTextColor(Jtv.TEXTO2)
             textSize = 14f
             gravity = Gravity.CENTER
             setPadding(0, dp(6), 0, dp(18))

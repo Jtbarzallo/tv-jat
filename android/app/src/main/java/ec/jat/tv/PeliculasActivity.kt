@@ -31,8 +31,8 @@ class PeliculasActivity : Activity() {
 
     companion object {
         private const val PEDIR_PERMISO = 10
-        private const val FONDO = 0xFF0B0B0F.toInt()
-        private const val ROJO = 0xFFE50914.toInt()
+        private const val FONDO = Jtv.FONDO
+        private const val ROJO = Jtv.ELECTRICO
     }
 
     private var todas: List<Pelicula> = emptyList()
@@ -49,7 +49,7 @@ class PeliculasActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = FONDO
+        window.statusBarColor = Jtv.NEGRO
         window.navigationBarColor = FONDO
         construir()
         if (checkSelfPermission(permiso) == PackageManager.PERMISSION_GRANTED) cargar()
@@ -69,47 +69,44 @@ class PeliculasActivity : Activity() {
         else sinPermiso()
     }
 
-    // ---------------- pantalla ----------------
+    // ---------------- pantalla (diseño JTV) ----------------
     private fun construir() {
         val raiz = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(FONDO)
+            background = Jtv.Fondo()
         }
         val cabecera = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(14), dp(12), dp(4))
+            setPadding(dp(16), dp(14), dp(16), dp(4))
         }
         val textos = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        textos.addView(TextView(this).apply {
-            text = "MIS PELÍCULAS"
-            setTextColor(ROJO)
-            textSize = 24f
-            setTypeface(Typeface.DEFAULT_BOLD, Typeface.BOLD)
-            letterSpacing = 0.05f
-        })
-        subtitulo = TextView(this).apply { setTextColor(0xFF9A9AA5.toInt()); textSize = 13f }
+        val marca = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        marca.addView(Jtv.logo(this, 24), LinearLayout.LayoutParams(-2, dp(24)))
+        marca.addView(View(this).apply { background = Jtv.forma(this@PeliculasActivity, 1f, 0f, intArrayOf(Jtv.LINEA)) },
+            LinearLayout.LayoutParams(dp(1), dp(20)).apply { setMargins(dp(10), 0, dp(10), 0) })
+        marca.addView(Jtv.titular(this, "Películas", 21f))
+        textos.addView(marca)
+        subtitulo = TextView(this).apply { setTextColor(Jtv.TEXTO2); Jtv.sp(this, 13f); setPadding(0, dp(4), 0, 0) }
         textos.addView(subtitulo)
         cabecera.addView(textos, LinearLayout.LayoutParams(0, -2, 1f))
-        cabecera.addView(Button(this).apply {
-            text = "📺 TV"
-            isAllCaps = false
-            setTextColor(Color.WHITE)
-            background = GradientDrawable().apply { setColor(0xFF26262E.toInt()); cornerRadius = dp(8).toFloat() }
-            setOnClickListener {
-                startActivity(Intent(this@PeliculasActivity, MainActivity::class.java))
-            }
-        }, LinearLayout.LayoutParams(-2, dp(40)))
+        cabecera.addView(Jtv.botonSecundario(this, "📺  TV") {
+            startActivity(Intent(this@PeliculasActivity, MainActivity::class.java))
+        }.apply { setPadding(dp(16), 0, dp(16), 0); Jtv.sp(this, 14f) }, LinearLayout.LayoutParams(-2, dp(44)))
         raiz.addView(cabecera)
+        Jtv.aparecer(cabecera)
 
+        val fondoBuscar = Jtv.forma(this, 14f, 10f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE, 0.92f)), Jtv.LINEA, 1.2f)
         buscar = EditText(this).apply {
-            hint = "🔍 Buscar película"
-            setHintTextColor(0xFF6E6E7A.toInt())
+            hint = "🔍  Buscar película"
+            setHintTextColor(Jtv.TEXTO3)
             setTextColor(Color.WHITE)
+            Jtv.sp(this, 15f)
             isSingleLine = true
             inputType = InputType.TYPE_CLASS_TEXT
-            background = GradientDrawable().apply { setColor(0xFF1C1C22.toInt()); cornerRadius = dp(8).toFloat() }
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = fondoBuscar
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setOnFocusChangeListener { _, f -> fondoBuscar.borde = if (f) Jtv.ELECTRICO else Jtv.LINEA }
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
@@ -117,15 +114,16 @@ class PeliculasActivity : Activity() {
             })
         }
         raiz.addView(buscar, LinearLayout.LayoutParams(-1, -2).apply {
-            setMargins(dp(16), dp(8), dp(16), dp(6))
+            setMargins(dp(16), dp(10), dp(16), dp(8))
         })
 
         contenido = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, dp(24))
+            setPadding(0, 0, 0, dp(28))
         }
         raiz.addView(ScrollView(this).apply {
             isFillViewport = true
+            isVerticalScrollBarEnabled = false
             addView(contenido)
         }, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(raiz)
@@ -135,18 +133,13 @@ class PeliculasActivity : Activity() {
         contenido.removeAllViews()
         contenido.addView(TextView(this).apply {
             text = texto
-            setTextColor(0xFFCCCCD5.toInt())
-            textSize = 16f
+            setTextColor(Jtv.TEXTO2)
+            Jtv.sp(this, 16f)
             gravity = Gravity.CENTER
-            setPadding(dp(24), dp(60), dp(24), dp(16))
+            setPadding(dp(24), dp(60), dp(24), dp(18))
         })
-        if (boton != null) contenido.addView(Button(this).apply {
-            text = boton
-            isAllCaps = false
-            setTextColor(Color.WHITE)
-            background = GradientDrawable().apply { setColor(ROJO); cornerRadius = dp(8).toFloat() }
-            setOnClickListener { accion?.invoke() }
-        }, LinearLayout.LayoutParams(-2, dp(46)).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        if (boton != null) contenido.addView(Jtv.botonPrimario(this, boton) { accion?.invoke() },
+            LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
     }
 
     private fun sinPermiso() = aviso(
@@ -205,49 +198,64 @@ class PeliculasActivity : Activity() {
         cuadricula("Todas (A-Z)", todas.sortedBy { it.titulo.lowercase() })
     }
 
-    // Película grande arriba
+    // Película grande arriba (banner principal con el estilo JTV)
     private fun portada(p: Pelicula, continuar: Boolean) {
-        val marco = FrameLayout(this)
-        val img = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; setBackgroundColor(0xFF1C1C22.toInt()) }
+        val marco = FrameLayout(this).apply {
+            background = Jtv.forma(this@PeliculasActivity, 22f, 20f, intArrayOf(Jtv.SUPERFICIE2, Jtv.NAVY), Jtv.LINEA, 1.2f)
+            clipToOutline = true
+        }
+        val img = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
         Peliculas.miniatura(this, img, p)
         marco.addView(img, FrameLayout.LayoutParams(-1, -1))
         marco.addView(View(this).apply {
-            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x00000000, 0xEE0B0B0F.toInt()))
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0x00000000, Jtv.conAlfa(Jtv.NAVY, 0.55f), Jtv.conAlfa(Jtv.FONDO, 0.97f)))
+        }, FrameLayout.LayoutParams(-1, -1))
+        // franja diagonal de luz (como el banner de JTV)
+        marco.addView(View(this).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.BL_TR,
+                intArrayOf(Jtv.conAlfa(Jtv.ELECTRICO, 0.0f), Jtv.conAlfa(Jtv.ELECTRICO, 0.28f), Jtv.conAlfa(Jtv.VIOLETA, 0.0f)))
         }, FrameLayout.LayoutParams(-1, -1))
         val abajo = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), 0, dp(16), dp(14))
+            setPadding(dp(18), 0, dp(18), dp(18))
         }
+        abajo.addView(Jtv.etiqueta(this, if (continuar) "Seguir viendo" else "Destacada"))
+        abajo.addView(Jtv.titular(this, p.titulo, 24f).apply { maxLines = 2 }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
         abajo.addView(TextView(this).apply {
-            text = p.titulo
-            setTextColor(Color.WHITE)
-            textSize = 22f
-            setTypeface(Typeface.DEFAULT_BOLD, Typeface.BOLD)
-            maxLines = 2
-        })
-        abajo.addView(TextView(this).apply {
-            text = "${Peliculas.duracionTexto(p.duracionMs)} · ${p.carpeta}"
-            setTextColor(0xFFBBBBC5.toInt())
-            textSize = 13f
-        })
-        abajo.addView(Button(this).apply {
-            text = if (continuar) "▶  Continuar" else "▶  Reproducir"
-            isAllCaps = false
-            textSize = 16f
-            setTextColor(Color.BLACK)
-            background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(6).toFloat() }
-            setOnClickListener { reproducir(listOf(p), 0) }
-        }, LinearLayout.LayoutParams(-2, dp(44)).apply { topMargin = dp(10) })
+            text = "${Peliculas.duracionTexto(p.duracionMs)}  ·  ${p.carpeta}"
+            setTextColor(Jtv.TEXTO2)
+            Jtv.sp(this, 13f)
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        val avance = Peliculas.avance(this, p)
+        if (continuar && avance > 0f && avance < 1f) {
+            val barra = FrameLayout(this).apply { background = Jtv.redondo(this@PeliculasActivity, 2f, intArrayOf(0x44FFFFFF)) }
+            barra.addView(View(this).apply { background = Jtv.redondo(this@PeliculasActivity, 2f, intArrayOf(Jtv.CIELO, Jtv.ELECTRICO, Jtv.VIOLETA)) },
+                FrameLayout.LayoutParams((dp(180) * avance).toInt().coerceAtLeast(dp(6)), -1))
+            abajo.addView(barra, LinearLayout.LayoutParams(dp(180), dp(4)).apply { topMargin = dp(10) })
+        }
+        abajo.addView(Jtv.botonPrimario(this, if (continuar) "▶  Continuar" else "▶  Reproducir") { reproducir(listOf(p), 0) },
+            LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(14) })
         marco.addView(abajo, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
-        contenido.addView(marco, LinearLayout.LayoutParams(-1, (resources.displayMetrics.widthPixels * 0.62).toInt()))
+        val ancho = resources.displayMetrics.widthPixels - dp(32)
+        val alto = (ancho * 0.62).toInt().coerceAtMost((resources.displayMetrics.heightPixels * 0.55).toInt())
+        val env = FrameLayout(this).apply { setPadding(dp(16), dp(6), dp(16), dp(4)) }
+        env.addView(marco, FrameLayout.LayoutParams(-1, alto))
+        Jtv.sombraAzul(marco, 10f)
+        contenido.addView(env)
+        Jtv.aparecer(marco, 80)
     }
 
-    private fun tituloFila(t: String) = TextView(this).apply {
-        text = t
-        setTextColor(Color.WHITE)
-        textSize = 17f
-        setTypeface(Typeface.DEFAULT_BOLD, Typeface.BOLD)
-        setPadding(dp(16), dp(18), dp(16), dp(8))
+    private fun tituloFila(t: String): View {
+        val caja = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(22), dp(16), dp(10))
+        }
+        caja.addView(View(this).apply { background = Jtv.forma(this@PeliculasActivity, 2f, 2f, intArrayOf(Jtv.CIELO, Jtv.VIOLETA), diagonal = false) },
+            LinearLayout.LayoutParams(dp(4), dp(18)).apply { marginEnd = dp(10) })
+        caja.addView(Jtv.titular(this, t, 17f))
+        return caja
     }
 
     // Fila que se desliza de lado
@@ -290,10 +298,12 @@ class PeliculasActivity : Activity() {
             setOnLongClickListener { opciones(p); true }
         }
         val marco = FrameLayout(this).apply {
-            background = GradientDrawable().apply { setColor(0xFF1C1C22.toInt()); cornerRadius = dp(6).toFloat() }
+            background = Jtv.forma(this@PeliculasActivity, 14f, 11f, Jtv.TARJETA, Jtv.LINEA, 1f)
             clipToOutline = true
             outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
         }
+        Jtv.vivo(tarjeta, 0.95f, android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+        tarjeta.foreground = null
         val img = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
         Peliculas.miniatura(this, img, p)
         marco.addView(img, FrameLayout.LayoutParams(-1, -1))
@@ -301,30 +311,32 @@ class PeliculasActivity : Activity() {
             text = Peliculas.duracionTexto(p.duracionMs)
             setTextColor(Color.WHITE)
             textSize = 10f
-            setPadding(dp(5), dp(1), dp(5), dp(1))
-            background = GradientDrawable().apply { setColor(0xAA000000.toInt()); cornerRadius = dp(4).toFloat() }
+            typeface = Jtv.textoFuerte(this@PeliculasActivity)
+            setPadding(dp(6), dp(1), dp(6), dp(1))
+            background = Jtv.forma(this@PeliculasActivity, 5f, 4f, intArrayOf(Jtv.conAlfa(Jtv.NAVY, 0.85f)))
         }, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply { setMargins(0, 0, dp(5), dp(7)) })
         if (Peliculas.vista(this, p)) marco.addView(TextView(this).apply {
             text = "✔"
             setTextColor(Color.WHITE)
             textSize = 12f
             setPadding(dp(6), dp(1), dp(6), dp(1))
-            background = GradientDrawable().apply { setColor(0xCC2E7D32.toInt()); cornerRadius = dp(4).toFloat() }
+            background = Jtv.forma(this@PeliculasActivity, 5f, 4f, intArrayOf(Jtv.EXITO, 0xFF1FA874.toInt()))
         }, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply { setMargins(0, dp(5), dp(5), 0) })
         val avance = Peliculas.avance(this, p)
         if (avance > 0f && avance < 1f) {
-            val barra = FrameLayout(this).apply { setBackgroundColor(0x88FFFFFF.toInt()) }
-            barra.addView(View(this).apply { setBackgroundColor(ROJO) },
+            val barra = FrameLayout(this).apply { setBackgroundColor(0x55FFFFFF) }
+            barra.addView(View(this).apply { background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(Jtv.CIELO, Jtv.ELECTRICO, Jtv.VIOLETA)) },
                 FrameLayout.LayoutParams((ancho * avance).toInt().coerceAtLeast(dp(4)), -1))
             marco.addView(barra, FrameLayout.LayoutParams(-1, dp(3), Gravity.BOTTOM))
         }
         tarjeta.addView(marco, LinearLayout.LayoutParams(-1, alto))
         tarjeta.addView(TextView(this).apply {
             text = p.titulo
-            setTextColor(0xFFE5E5EA.toInt())
+            setTextColor(Jtv.HIELO)
             textSize = 13f
+            typeface = Jtv.textoFuerte(this@PeliculasActivity)
             maxLines = 2
-            setPadding(dp(2), dp(4), dp(2), dp(6))
+            setPadding(dp(4), dp(6), dp(2), dp(8))
         })
         return tarjeta
     }

@@ -33,7 +33,7 @@ object Registro {
 
     fun leer(ctx: Context): String = try {
         File(ctx.filesDir, ARCHIVO).takeIf { it.exists() }?.readText()?.ifBlank { null }
-    } catch (e: Exception) { null } ?: "Todavía no hay nada anotado.\nConecta el celular al carro, abre TV JAT y toca un canal; luego vuelve aquí."
+    } catch (e: Exception) { null } ?: "Todavía no hay nada anotado.\nConecta el celular al carro, abre JTV y toca un canal; luego vuelve aquí."
 
     fun borrar(ctx: Context) { try { File(ctx.filesDir, ARCHIVO).delete() } catch (e: Exception) {} }
 
