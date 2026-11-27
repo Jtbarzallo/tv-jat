@@ -208,3 +208,10 @@
   y por teclado, ⏮ ⏭ y el "seguir en el último canal" también usan solo favoritos. Mis Películas sigue igual. Si no hay
   favoritos, avisa que se marquen con la ★ en TV JAT del celular. La app del celular no cambia. Respaldo: sin datos
   nuevos (los favoritos ya van en respaldo_tv_jat.json).
+- 2026-11-26: Jorge manda captura (celular, iCarly LatAm): al mover la línea de tiempo el video se queda quieto en
+  "Cargando…". Causa: los canales que traen el audio aparte (Pluto TV, como iCarly) no se grababan ("se ve directo"),
+  así que la barra solo tenía los ~25 s que guarda el servidor del canal; al ir al inicio esa parte ya estaba borrada
+  y se trababa. → v1.23: 1) el grabador ahora graba también los canales con audio aparte (dos pistas, video y
+  audio, con la misma numeración); 2) en vivo la barra no deja ir al borde de lo grabado (8 s de margen; 20 s si el
+  canal es directo); 3) si un salto sigue cargando a los 12 s, vuelve solo al EN VIVO con un aviso. Igual en el
+  celular y en el carro. Respaldo: sin datos nuevos (lo grabado es temporal en la caché).

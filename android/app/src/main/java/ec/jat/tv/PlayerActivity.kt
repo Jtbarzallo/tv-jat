@@ -329,7 +329,7 @@ class PlayerActivity : Activity() {
         barra = BarraTiempo(this).apply {
             alTocar = { f ->
                 val p = player
-                if (p != null && p.duration > 0 && p.duration != C.TIME_UNSET) { p.seekTo((p.duration * f).toLong()); actualizarCapa() }
+                if (p != null) { Salto.ir(p, f) { avisoBreve("No se pudo ir a ese punto. Volví a EN VIVO") }; actualizarCapa() }
                 tocado()
             }
         }

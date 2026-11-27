@@ -913,7 +913,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val br = Barra(c).apply {
             alTocar = { f ->
                 // películas: salta a ese minuto · en vivo: regresa en la línea de tiempo
-                if (player.duration > 0 && player.duration != C.TIME_UNSET) { player.seekTo((player.duration * f).toLong()); actualizarCapa() }
+                Salto.ir(player, f) { avisoBreve("No se pudo ir a ese punto.\nVolví a EN VIVO") }
+                actualizarCapa()
                 tocado()
             }
         }
