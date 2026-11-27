@@ -225,3 +225,11 @@
   agrandado con mouse, chips de categorías, insignia EN VIVO, fondo con franjas diagonales; 4) tema propio para
   ventanas emergentes y menús; 5) PC: estilos.css nuevo con las mismas reglas (fuentes incluidas, sin internet).
   Todas las funciones siguen igual. Respaldo: sin datos nuevos (el grupo elegido en los chips no se guarda).
+- 2026-11-26: Jorge pide "que funcione TikTok en Android Auto" → v1.25: TikTok dentro de JTV Video (la web de TikTok en
+  versión de computadora, en un navegador propio en la pantalla del carro, como el navegador de Fermata). Se abre con el
+  chip "🎵 TikTok" de arriba, en ☰ Guía o en el menú del carro. Controles: ▲ ⏯ ▼ 📺 al costado y en la barra del carro;
+  deslizar el dedo hacia arriba = siguiente video. Tocar la pantalla toca la página (me gusta, comentarios, etc.).
+  Al elegir un canal o película se cierra TikTok solo. Con el carro en marcha y sin modo pasajero la imagen se tapa
+  igual que la TV. Iniciar sesión: desde el celular, JTV → ⋮ → "Iniciar sesión de TikTok (carro)" (la cuenta queda
+  guardada dentro de JTV Video). Respaldo: la sesión de TikTok son cookies de TikTok (si se borra, se vuelve a iniciar
+  sesión); no hay datos de Jorge que respaldar.

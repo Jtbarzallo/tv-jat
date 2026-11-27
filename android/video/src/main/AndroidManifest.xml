@@ -43,6 +43,14 @@
             android:exported="true"
             android:label="Permisos de JTV Video" />
 
+        <!-- Iniciar sesión de TikTok desde el celular (la sesión se usa en el TikTok del carro) -->
+        <activity
+            android:name=".TikTokActivity"
+            android:exported="true"
+            android:label="TikTok en JTV Video"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
             android:name="ec.jat.tv.AutoVideoService"
             android:exported="true"

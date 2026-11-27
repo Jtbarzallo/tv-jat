@@ -426,6 +426,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     fun ponerCanales(lista: List<Canal>, inicio: Int) {
         if (lista.isEmpty()) return
+        if (enWeb) cerrarTikTok()
         guardarAvance(true)
         AutoService.pausarSiSuena()
         modo = Modo.CANALES
@@ -462,6 +463,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     fun ponerPeliculas(lista: List<Pelicula>, inicio: Int) {
         if (lista.isEmpty()) return
+        if (enWeb) cerrarTikTok()
         guardarAvance(true)
         AutoService.pausarSiSuena()
         modo = Modo.PELICULAS
@@ -555,6 +557,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         // al abrir, mostrar la interfaz unos segundos para que se vea cómo usarla
         if (capa != null) main.postDelayed({ if (capa != null && !panelVisible) mostrarPanel() }, 800)
         Registro.anotar(ctx, "   pantalla del carro: $dPantalla · forma $dForma")
+        if (enWeb) { if (directa) cerrarTikTok() else armarWeb() }
     }
 
     override fun onVisibleAreaChanged(visibleArea: Rect) {
@@ -641,6 +644,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     }
 
     private fun liberarPantalla() {
+        quitarWeb()
         textura?.let { player.clearVideoTextureView(it) }
         textura = null
         try { pres?.dismiss() } catch (e: Exception) {}
@@ -846,6 +850,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val cc = chip(c, "📺 Canales") { panelVista = "canales"; pintarPanel() }
         val cpel = chip(c, "🎬 Películas") { panelVista = if (carpetaSel.isNotEmpty() && modo == Modo.PELICULAS) "carpeta" else "pelis"; pintarPanel() }
         arriba.addView(cc); arriba.addView(cpel)
+        arriba.addView(chip(c, "🎵 TikTok") { abrirTikTok() })
         // logo oficial de JTV al centro
         val centroLogo = FrameLayout(c)
         centroLogo.addView(Jtv.logo(c, 28), FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(c, 28), Gravity.CENTER))
@@ -1165,6 +1170,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 val todos = canales()
                 fila("★ Favoritos", "${todos.size} canales", true) { grupoSel = null; panelVista = "canales"; pintarPanel() }
                 fila("🎬 Mis Películas", "Videos del celular") { panelVista = "pelis"; pintarPanel() }
+                fila("🎵 TikTok", "Videos de TikTok en el carro") { abrirTikTok() }
             }
             "pelis" -> {
                 panelTitulo?.text = "🎬 Mis Películas"
@@ -1548,7 +1554,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     // cuadros. Por eso: si no hay nada encima, el video va DIRECTO a la pantalla del carro (fluido);
     // al tocar (lista, avisos, voz) se pasa a la pantalla intermedia, y al esconderse vuelve a directo.
     private fun hayAlgoEncima(): Boolean =
-        panelVisible || escuchando || avisoFijo.isNotEmpty() || avisoTemporal.isNotEmpty()
+        enWeb || panelVisible || escuchando || avisoFijo.isNotEmpty() || avisoTemporal.isNotEmpty()
 
     private val aDirecto = Runnable { usarDirecto() }
 
@@ -1634,9 +1640,104 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         try { ctx.finishCarApp() } catch (e: Exception) {}
     }
 
+    // ------------------------------------------------------------------ TikTok en el carro
+    /** true mientras se ve TikTok (la web de TikTok en la pantalla del carro). */
+    var enWeb = false
+        private set
+    private var web: android.webkit.WebView? = null
+    private var capaWeb: FrameLayout? = null
+    private var deslizado = 0f
+    private var ultimoMovimientoWeb = 0L
+
+    fun abrirTikTok() {
+        if (directa || raizVista == null) {
+            avisoBreve("TikTok necesita la pantalla normal.\nCierra JTV Video y vuelve a abrirlo."); return
+        }
+        guardarAvance(true)
+        player.pause()
+        enWeb = true
+        ocultarPanel()
+        main.removeCallbacks(aDirecto)
+        usarPresentacion()
+        armarWeb()
+        Registro.anotar(ctx, "🎵 TikTok abierto en el carro")
+        alCambiar?.invoke()
+    }
+
+    fun cerrarTikTok() {
+        if (!enWeb) return
+        enWeb = false
+        quitarWeb()
+        Registro.anotar(ctx, "🎵 TikTok cerrado: vuelve a la TV")
+        alCambiar?.invoke()
+        revisarSalida()
+    }
+
+    private fun armarWeb() {
+        val raiz = raizVista ?: return
+        if (capaWeb != null) return
+        val c = raiz.context
+        val cw = FrameLayout(c).apply { setBackgroundColor(Color.BLACK); isClickable = true }
+        val w = try { TikTok.crearWeb(c) } catch (e: Exception) {
+            Registro.anotar(ctx, "   ⚠ TikTok no pudo abrir el navegador: ${e.javaClass.simpleName}")
+            enWeb = false; avisoBreve("No se pudo abrir TikTok"); return
+        }
+        cw.addView(w, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // botones grandes al costado: anterior, pausa, siguiente y volver a la TV
+        val lado = LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(c, 8), dp(c, 8), dp(c, 8), dp(c, 8))
+            background = Jtv.forma(c, 18f, 14f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.80f), Jtv.conAlfa(Jtv.NAVY, 0.80f)), Jtv.LINEA, 1f)
+        }
+        fun boton(glifo: String, primario: Boolean = false, accion: () -> Unit) {
+            lado.addView(Jtv.botonIcono(c, glifo, 54, primario) { accion() },
+                LinearLayout.LayoutParams(dp(c, 54), dp(c, 54)).apply { setMargins(0, dp(c, 5), 0, dp(c, 5)) })
+        }
+        boton("▲") { moverWeb(false) }
+        boton("⏯", primario = true) { TikTok.pausa(w) }
+        boton("▼") { moverWeb(true) }
+        boton("📺") { cerrarTikTok() }
+        cw.addView(lado, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.END or Gravity.CENTER_VERTICAL).apply { rightMargin = dp(c, 10) })
+        // encima del video, debajo de la interfaz de la TV
+        val idx = capa?.let { raiz.indexOfChild(it) }?.takeIf { it >= 0 } ?: raiz.childCount
+        raiz.addView(cw, idx, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        web = w; capaWeb = cw
+        aplicarMovimiento()
+    }
+
+    private fun quitarWeb() {
+        TikTok.guardarSesion()
+        val cw = capaWeb
+        val w = web
+        capaWeb = null; web = null
+        try { (cw?.parent as? ViewGroup)?.removeView(cw) } catch (e: Exception) {}
+        try { w?.stopLoading(); w?.destroy() } catch (e: Exception) {}
+    }
+
+    /** Siguiente (abajo) o anterior video de TikTok; con un pequeño freno para que no salte dos de golpe. */
+    fun moverWeb(abajo: Boolean) {
+        val w = web ?: return
+        val ahora = SystemClock.uptimeMillis()
+        if (ahora - ultimoMovimientoWeb < 700) return
+        ultimoMovimientoWeb = ahora
+        TikTok.mover(w, abajo)
+    }
+
+    fun pausaWeb() { web?.let { TikTok.pausa(it) } }
+
+    /** Deslizar el dedo en el carro: hacia arriba = siguiente video, hacia abajo = anterior. */
+    private fun deslizarWeb(dy: Float) {
+        deslizado += dy
+        val umbral = dp(ctx, 90).toFloat()
+        if (deslizado > umbral) { deslizado = 0f; moverWeb(true) }
+        else if (deslizado < -umbral) { deslizado = 0f; moverWeb(false) }
+    }
+
     // toques en la pantalla del carro
     override fun onClick(x: Float, y: Float) {
-        if (capa == null || !panelVisible) { mostrarPanel(); return }
+        if (!enWeb && (capa == null || !panelVisible)) { mostrarPanel(); return }
         val raiz = raizVista ?: return
         val t = SystemClock.uptimeMillis()
         val ab = MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x, y, 0)
@@ -1646,12 +1747,14 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     }
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
+        if (enWeb) { deslizarWeb(distanceY); return }
         if (!panelVisible) return
         panelScroll?.scrollBy(0, distanceY.toInt())
         tocado()
     }
 
     override fun onFling(velocityX: Float, velocityY: Float) {
+        if (enWeb) { if (kotlin.math.abs(velocityY) > 800) moverWeb(velocityY < 0); return }
         if (!panelVisible) return
         panelScroll?.fling(-velocityY.toInt())
         tocado()
@@ -1731,6 +1834,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         } else {
             vista?.visibility = if (tapar) View.INVISIBLE else View.VISIBLE
         }
+        capaWeb?.visibility = if (tapar) View.INVISIBLE else View.VISIBLE
         pintarAviso()
     }
 
@@ -1881,6 +1985,16 @@ class PantallaVideo(ctx: CarContext, private val tv: VideoCarro) : Screen(ctx) {
             .setOnClickListener { accion() }.build()
 
     override fun onGetTemplate(): Template {
+        if (tv.enWeb) {
+            // TikTok: volver a la TV, anterior, pausa y siguiente (y deslizar el dedo para cambiar de video)
+            val sw = ActionStrip.Builder()
+                .addAction(Action.Builder().setTitle("📺 TV").setOnClickListener { tv.cerrarTikTok() }.build())
+                .addAction(icono(R.drawable.ic_arriba) { tv.moverWeb(false) })
+                .addAction(Action.Builder().setTitle("⏯").setOnClickListener { tv.pausaWeb() }.build())
+                .addAction(icono(R.drawable.ic_abajo) { tv.moverWeb(true) })
+            return NavigationTemplate.Builder().setActionStrip(sw.build())
+                .setMapActionStrip(ActionStrip.Builder().addAction(Action.PAN).build()).build()
+        }
         val pelis = tv.modo == Modo.PELICULAS
         // ☰ Lista muestra la lista ENCIMA del video (no se sale de la pantalla); ✕ la quita.
         val strip = ActionStrip.Builder()
@@ -1952,6 +2066,7 @@ class PantallaMenu(ctx: CarContext, tv: VideoCarro) : PantallaFilas(ctx, "JTV", 
         tv.irA(PantallaFilas(ctx, "★ Favoritos") { filasCanales(tv, tv.canales()) })
     })
     l.add(Fila("🎬 Mis Películas", "Videos guardados en el celular", true) { tv.irA(pantallaPeliculas(ctx, tv)) })
+    l.add(Fila("🎵 TikTok", "Videos de TikTok en la pantalla del carro") { tv.volverAlVideo(); tv.abrirTikTok() })
     l.add(Fila("🔍 Buscar canal") { tv.irA(PantallaBuscar(ctx, tv)) })
     val pasajero = Datos.modoPasajero(ctx)
     l.add(Fila(

@@ -452,6 +452,7 @@ class MainActivity : Activity() {
         val menu = PopupMenu(this, ancla)
         menu.menu.add(0, 8, 0, "🚗 Poner JTV Video en el carro")
         menu.menu.add(0, 9, 0, "🎤 Activar micrófono del carro")
+        menu.menu.add(0, 10, 0, "🎵 Iniciar sesión de TikTok (carro)")
         menu.menu.add(0, 5, 0, "🩺 Revisar qué canales funcionan")
         menu.menu.add(0, 6, 0, if (Datos.ocultarCaidos(this)) "👁 Mostrar también los que no funcionan"
                                else "🙈 Ocultar los que no funcionan")
@@ -476,6 +477,9 @@ class MainActivity : Activity() {
                     addCategory(Intent.CATEGORY_OPENABLE)
                     type = "*/*"
                 }, PEDIR_IMPORTAR)
+                10 -> try {
+                    startActivity(Intent().setClassName("ec.jat.tv.video", "ec.jat.tv.TikTokActivity"))
+                } catch (e: Exception) { aviso("Primero instala o actualiza JTV Video: ⋮ → Poner JTV Video en el carro") }
                 5 -> revisarCanales()
                 7 -> verDiagnostico()
                 9 -> try {
