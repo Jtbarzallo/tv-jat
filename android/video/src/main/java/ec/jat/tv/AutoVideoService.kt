@@ -398,8 +398,14 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             cacheMarca = marca
         }
         val caidos = Datos.caidos(ctx)
-        return if (Datos.ocultarCaidos(ctx)) cache.filter { it.url !in caidos } else cache
+        val lista = if (Datos.ocultarCaidos(ctx)) cache.filter { it.url !in caidos } else cache
+        // En el carro solo salen los FAVORITOS (los que Jorge marcó con ★); el resto no se muestra
+        val fav = favoritos()
+        return lista.filter { it.url in fav }
     }
+
+    /** Hay lista cargada en TV JAT (aunque no haya favoritos). */
+    private fun hayLista(): Boolean = cache.isNotEmpty() || (Datos.textoLista(ctx)?.isNotBlank() == true)
 
     fun grupoDe(c: Canal) = c.grupo.ifBlank { "Otros" }
 
@@ -439,7 +445,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         if (player.mediaItemCount > 0) return
         val todos = canales()
         if (todos.isEmpty()) {
-            ponerAviso("No hay lista de canales.\nAbre TV JAT en el celular y carga una lista.")
+            ponerAviso(if (hayLista()) "No tienes canales favoritos.\nEn TV JAT del celular toca la ★ de los canales que quieras ver aquí."
+                       else "No hay lista de canales.\nAbre TV JAT en el celular y carga una lista.")
             return
         }
         val i = todos.indexOfFirst { it.url == Datos.ultimo(ctx) }.coerceAtLeast(0)
@@ -1134,15 +1141,10 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         panelScroll?.scrollTo(0, 0)
         when (panelVista) {
             "grupos" -> {
-                panelTitulo?.text = "☰ Guía · elige un grupo"
+                panelTitulo?.text = "☰ Guía"
                 val todos = canales()
-                val fav = favoritos()
-                fila("★ Favoritos", "${todos.count { it.url in fav }} canales", grupoSel == "★") { grupoSel = "★"; panelVista = "canales"; pintarPanel() }
-                fila("📺 Todos", "${todos.size} canales", grupoSel == null) { grupoSel = null; panelVista = "canales"; pintarPanel() }
+                fila("★ Favoritos", "${todos.size} canales", true) { grupoSel = null; panelVista = "canales"; pintarPanel() }
                 fila("🎬 Mis Películas", "Videos del celular") { panelVista = "pelis"; pintarPanel() }
-                todos.groupBy { grupoDe(it) }.toSortedMap(compareBy<String>({ it.lowercase() }, { it })).forEach { (g, l) ->
-                    fila(g, "${l.size} canales", grupoSel == g) { grupoSel = g; panelVista = "canales"; pintarPanel() }
-                }
             }
             "pelis" -> {
                 panelTitulo?.text = "🎬 Mis Películas"
@@ -1202,19 +1204,14 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
                 fila("🔧 Diagnóstico", diagnostico()) {}
             }
             else -> {   // canales
-                val todos = canales()
-                val lista = when (grupoSel) {
-                    null -> todos
-                    "★" -> favoritos().let { f -> todos.filter { it.url in f } }
-                    else -> todos.filter { grupoDe(it) == grupoSel }
-                }
-                panelTitulo?.text = "📂 " + when (grupoSel) { null -> "Todos"; "★" -> "★ Favoritos"; else -> grupoSel } + "  ▾ cambiar"
+                val lista = canales()          // en el carro: solo favoritos
+                panelTitulo?.text = "★ Favoritos  ▾ cambiar"
                 val fav = favoritos()
                 val actual = if (modo == Modo.CANALES) canalActual?.url else null
                 lista.take(500).forEachIndexed { i, c ->
                     filaCanal(i + 1, c, c.url == actual, c.url in fav) { ponerCanales(lista, i); pintarPanel() }
                 }
-                if (lista.isEmpty()) fila("No hay canales aquí") {}
+                if (lista.isEmpty()) fila("No tienes canales favoritos", "En TV JAT del celular toca la ★ de los canales que quieras aquí") {}
             }
         }
         actualizarCapa()
@@ -1921,16 +1918,11 @@ private fun filasCanales(tv: VideoCarro, lista: List<Canal>): List<Fila> {
 }
 
 class PantallaMenu(ctx: CarContext, tv: VideoCarro) : PantallaFilas(ctx, "TV JAT", {
-    val todos = tv.canales()
-    val fav = Datos.favoritos(ctx).let { f -> todos.filter { it.url in f } }
+    val fav = tv.canales()          // en el carro: solo favoritos
     val l = ArrayList<Fila>()
-    if (fav.isNotEmpty()) l.add(Fila("★ Favoritos", "${fav.size} canales", true) {
-        tv.irA(PantallaFilas(ctx, "★ Favoritos") { filasCanales(tv, fav) })
+    l.add(Fila("★ Favoritos", "${fav.size} canales", true) {
+        tv.irA(PantallaFilas(ctx, "★ Favoritos") { filasCanales(tv, tv.canales()) })
     })
-    l.add(Fila("📺 Todos los canales", "${todos.size} canales", true) {
-        tv.irA(PantallaFilas(ctx, "Todos los canales") { filasCanales(tv, tv.canales()) })
-    })
-    l.add(Fila("📂 Canales por grupo", "", true) { tv.irA(pantallaGrupos(ctx, tv)) })
     l.add(Fila("🎬 Mis Películas", "Videos guardados en el celular", true) { tv.irA(pantallaPeliculas(ctx, tv)) })
     l.add(Fila("🔍 Buscar canal") { tv.irA(PantallaBuscar(ctx, tv)) })
     val pasajero = Datos.modoPasajero(ctx)
@@ -1942,13 +1934,6 @@ class PantallaMenu(ctx: CarContext, tv: VideoCarro) : PantallaFilas(ctx, "TV JAT
     l.add(Fila("🔧 Diagnóstico", tv.diagnostico()) { tv.volverAlVideo() })
     l
 })
-
-private fun pantallaGrupos(ctx: CarContext, tv: VideoCarro) = PantallaFilas(ctx, "Grupos") {
-    val todos = tv.canales()
-    todos.groupBy { tv.grupoDe(it) }.toSortedMap(compareBy<String>({ it.lowercase() }, { it })).map { (g, lista) ->
-        Fila(g, "${lista.size} canales", true) { tv.irA(PantallaFilas(ctx, g) { filasCanales(tv, lista) }) }
-    }
-}
 
 private fun filasPeliculas(tv: VideoCarro, mostrar: List<Pelicula>, todas: List<Pelicula>): List<Fila> = mostrar.map { p ->
     val av = Peliculas.avance(tv.ctx, p)

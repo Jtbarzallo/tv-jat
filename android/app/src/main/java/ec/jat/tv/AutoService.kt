@@ -33,7 +33,7 @@ import java.io.File
  * Android Auto no deja ver video en la pantalla del carro (solo apps de audio), así que aquí los
  * canales se ESCUCHAN como si fueran radio: se apaga la imagen y se baja solo el sonido
  * (además así gasta muchos menos datos).
- * Menú en el carro: ★ Favoritos · 📺 Todos los canales · un menú por cada grupo de la lista.
+ * En el carro solo salen los canales FAVORITOS (los marcados con ★ en el celular); el resto no se muestra.
  */
 class AutoService : MediaLibraryService() {
 
@@ -80,13 +80,13 @@ class AutoService : MediaLibraryService() {
 
     private fun grupoDe(c: Canal) = c.grupo.ifBlank { "Otros" }
 
-    private fun grupos(): List<String> = canales().map { grupoDe(it) }.distinct().sortedBy { it.lowercase() }
 
     /** Lista de canales de un menú (contexto). */
     private fun contexto(ctx: String): List<Canal> {
-        val todos = canales()
+        // en el carro todo sale solo de los favoritos
+        val todos = Datos.favoritos(this).let { f -> canales().filter { it.url in f } }
         return when {
-            ctx == FAVORITOS -> { val f = Datos.favoritos(this); todos.filter { it.url in f } }
+            ctx == FAVORITOS -> todos
             ctx == TODOS -> todos
             ctx.startsWith(GRUPO) -> { val g = ctx.removePrefix(GRUPO); todos.filter { grupoDe(it) == g } }
             else -> emptyList()
@@ -126,13 +126,11 @@ class AutoService : MediaLibraryService() {
 
     private fun hijos(id: String): List<MediaItem> = when {
         id == RAIZ -> {
-            val l = ArrayList<MediaItem>()
-            val nFav = contexto(FAVORITOS).size
-            if (nFav > 0) l.add(carpeta(FAVORITOS, "★ Favoritos", "$nFav canales"))
-            l.add(carpeta(TODOS, "📺 Todos los canales", "${canales().size} canales"))
-            val gs = grupos()
-            if (gs.size > 1) gs.forEach { g -> l.add(carpeta(GRUPO + g, g)) }
-            l
+            // solo favoritos, directo en la primera pantalla
+            val fav = contexto(FAVORITOS)
+            if (fav.isEmpty()) listOf(carpeta(FAVORITOS, "No tienes canales favoritos",
+                "En TV JAT del celular toca la ★ de los canales que quieras aquí"))
+            else fav.map { itemCanal(it, FAVORITOS) }
         }
         id == FAVORITOS || id == TODOS || id.startsWith(GRUPO) -> contexto(id).map { itemCanal(it, id) }
         else -> emptyList()
@@ -155,7 +153,7 @@ class AutoService : MediaLibraryService() {
         val url = resto.substringAfter(SEP)
         var lista = contexto(ctx)
         var ctxUsado = ctx
-        if (lista.none { it.url == url }) { lista = canales(); ctxUsado = TODOS }
+        if (lista.none { it.url == url }) { lista = contexto(FAVORITOS); ctxUsado = FAVORITOS }
         val i = lista.indexOfFirst { it.url == url }
         if (i < 0) return null
         listaActual = lista
@@ -165,8 +163,8 @@ class AutoService : MediaLibraryService() {
     private fun buscar(q: String): List<MediaItem> {
         val t = q.trim().lowercase()
         if (t.isEmpty()) return emptyList()
-        return canales().filter { it.nombre.lowercase().contains(t) || it.grupo.lowercase().contains(t) }
-            .take(100).map { itemCanal(it, TODOS) }
+        return contexto(FAVORITOS).filter { it.nombre.lowercase().contains(t) || it.grupo.lowercase().contains(t) }
+            .take(100).map { itemCanal(it, FAVORITOS) }
     }
 
     // --------------------------------------------------------------- reproductor
@@ -174,7 +172,7 @@ class AutoService : MediaLibraryService() {
         super.onCreate()
         instancia = this
         Registro.instalar(this)
-        Registro.anotar(this, "🚗 Servicio de audio (TV JAT) iniciado. Canales en la lista: ${canales().size}")
+        Registro.anotar(this, "🚗 Servicio de audio (TV JAT) iniciado. Canales en la lista: ${canales().size} · favoritos en el carro: ${contexto(FAVORITOS).size}")
         val http = DefaultHttpDataSource.Factory()
             .setUserAgent(Reproduccion.USER_AGENT)
             .setAllowCrossProtocolRedirects(true)
@@ -341,8 +339,8 @@ class AutoService : MediaLibraryService() {
                 val consulta = mediaItems[0].requestMetadata.searchQuery
                 if (consulta != null) {
                     var lista = buscar(consulta)
-                    if (lista.isEmpty()) lista = contexto(TODOS).map { itemCanal(it, TODOS) }
-                    listaActual = canales()
+                    if (lista.isEmpty()) lista = contexto(FAVORITOS).map { itemCanal(it, FAVORITOS) }
+                    listaActual = contexto(FAVORITOS)
                     return Futures.immediateFuture(MediaSession.MediaItemsWithStartPosition(lista, 0, C.TIME_UNSET))
                 }
                 val r = resolver(mediaItems[0].mediaId)
@@ -362,8 +360,8 @@ class AutoService : MediaLibraryService() {
             mediaSession: MediaSession, controller: MediaSession.ControllerInfo
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
             val ultimo = Datos.ultimo(this@AutoService)
-            val r = resolver("$CANAL$TODOS$SEP$ultimo")
-                ?: canales().firstOrNull()?.let { resolver("$CANAL$TODOS$SEP${it.url}") }
+            val r = resolver("$CANAL$FAVORITOS$SEP$ultimo")
+                ?: contexto(FAVORITOS).firstOrNull()?.let { resolver("$CANAL$FAVORITOS$SEP${it.url}") }
             return Futures.immediateFuture(
                 if (r == null) MediaSession.MediaItemsWithStartPosition(emptyList(), 0, 0)
                 else MediaSession.MediaItemsWithStartPosition(r.first, r.second, C.TIME_UNSET)

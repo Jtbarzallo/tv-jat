@@ -203,3 +203,8 @@
   no cambia de pantalla mientras el canal carga, y si aun así falla vuelve sola a la forma normal (con la lista
   encima) por el resto de la sesión y reintenta el MISMO canal en vez de saltar. Dato del registro: con la lista
   encima marcó "0 cuadros perdidos". Respaldo: sin datos nuevos.
+- 2026-11-26: Jorge pide "solo pon favoritos, elimina el resto en Android Auto" → v1.22: en el carro (TV JAT sonido y
+  TV JAT Video) solo salen los canales marcados con ★. Se quitaron "Todos los canales" y los grupos; la búsqueda por voz
+  y por teclado, ⏮ ⏭ y el "seguir en el último canal" también usan solo favoritos. Mis Películas sigue igual. Si no hay
+  favoritos, avisa que se marquen con la ★ en TV JAT del celular. La app del celular no cambia. Respaldo: sin datos
+  nuevos (los favoritos ya van en respaldo_tv_jat.json).
