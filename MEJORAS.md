@@ -273,3 +273,9 @@
   en el diagnóstico qué audio trae ("🔊 audio: ac3 · 6 canales · ✅ se oye") y, si aun así no se puede, avisa en
   pantalla "🔇 Este canal trae un audio que no se puede reproducir". Las APK solo para celulares ARM (todas las de
   Jorge). Respaldo: sin datos nuevos.
+- 2026-11-28: Jorge (fotos en el carro): en JTV YouTube tocó "Acceder" y salió la página de Google para iniciar
+  sesión, pero "no aparece el teclado" (el teclado del celular no sale en la pantalla del carro) → v1.31 (JTV YouTube):
+  1) al tocar cualquier cuadro de texto de la página se abre el TECLADO DEL CARRO (pantalla de escribir de Android
+  Auto) y lo escrito se pone en el cuadro (si es el buscador, busca solo); 2) la página de inicio de sesión de Google
+  ya no se abre en el carro: sale el aviso "Para entrar con tu cuenta usa el celular: JTV → ⋮ → Iniciar sesión de
+  YouTube (carro)" y YouTube sigue sin cuenta. Respaldo: sin datos nuevos.

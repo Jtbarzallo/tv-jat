@@ -84,8 +84,14 @@ object YouTubeWeb {
     const val INICIO = "https://m.youtube.com/"
     const val LOGIN = "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fm.youtube.com%2F"
 
-    @SuppressLint("SetJavaScriptEnabled")
-    fun crear(c: Context, inicio: String, alPantallaCompleta: ((View?, WebChromeClient.CustomViewCallback?) -> Unit)? = null): WebView = WebView(c).apply {
+    /**
+     * enCarro = true: en el carro no hay teclado del celular, así que (1) al tocar un cuadro de texto se abre el
+     * teclado del carro (alEscribir) y (2) la página de inicio de sesión de Google no se abre (alLogin): la sesión
+     * se inicia desde el celular.
+     */
+    @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
+    fun crear(c: Context, inicio: String, alPantallaCompleta: ((View?, WebChromeClient.CustomViewCallback?) -> Unit)? = null,
+              enCarro: Boolean = false, alEscribir: ((String, Boolean) -> Unit)? = null, alLogin: (() -> Unit)? = null): WebView = WebView(c).apply {
         setBackgroundColor(Color.BLACK)
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
@@ -102,12 +108,50 @@ object YouTubeWeb {
             // YouTube intenta abrir su app (intent://, vnd.youtube://): en el carro se queda en la web
             override fun shouldOverrideUrlLoading(v: WebView, r: WebResourceRequest): Boolean {
                 val s = r.url.scheme ?: return true
-                return s != "http" && s != "https"
+                if (s != "http" && s != "https") return true
+                if (enCarro && (r.url.host ?: "").contains("accounts.google.")) { alLogin?.invoke(); return true }
+                return false
+            }
+            override fun onPageFinished(v: WebView, url: String?) {
+                if (enCarro) v.evaluateJavascript(JS_TECLADO, null)
+                if (enCarro && (url ?: "").contains("accounts.google.")) { alLogin?.invoke(); v.loadUrl(INICIO) }
             }
         }
         isFocusable = true
         isFocusableInTouchMode = true
+        if (enCarro && alEscribir != null) addJavascriptInterface(object {
+            @android.webkit.JavascriptInterface
+            fun escribir(tipo: String, pista: String) { Handler(Looper.getMainLooper()).post { alEscribir(pista, tipo == "password") } }
+        }, "JTVTeclado")
         loadUrl(inicio)
+    }
+
+    /** Avisa cuando se toca un cuadro de texto de la página (para abrir el teclado del carro). */
+    private const val JS_TECLADO = """(function(){
+        if(window.__jtvTeclado)return; window.__jtvTeclado=1;
+        document.addEventListener('focusin',function(e){
+            var t=e.target; if(!t)return;
+            var ok=t.tagName=='TEXTAREA'||t.isContentEditable||(t.tagName=='INPUT'&&['text','search','email','tel','url','password','number',''].indexOf((t.type||'').toLowerCase())>=0);
+            if(!ok)return; window.__jtvCampo=t;
+            JTVTeclado.escribir((t.type||'text').toLowerCase(), t.placeholder||t.getAttribute('aria-label')||'');
+        },true);
+    })();"""
+
+    /** Pone el texto escrito en el teclado del carro dentro del cuadro de la página (y busca si es un buscador). */
+    fun jsPoner(texto: String): String {
+        val t = org.json.JSONObject.quote(texto)
+        return """(function(){
+            var c=window.__jtvCampo||document.activeElement; if(!c)return;
+            c.focus();
+            var p=c.tagName=='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
+            var d=Object.getOwnPropertyDescriptor(p,'value');
+            if(c.isContentEditable)c.textContent=$t; else if(d&&d.set)d.set.call(c,$t); else c.value=$t;
+            c.dispatchEvent(new Event('input',{bubbles:true})); c.dispatchEvent(new Event('change',{bubbles:true}));
+            if((c.type||'')=='search'||c.getAttribute('role')=='combobox'||/search|buscar/i.test(c.name||c.className||'')){
+                var f=c.form; if(f){ if(f.requestSubmit)f.requestSubmit(); else f.submit(); }
+                else ['keydown','keypress','keyup'].forEach(function(k){c.dispatchEvent(new KeyboardEvent(k,{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));});
+            }
+        })();"""
     }
 
     fun guardarSesion() { try { CookieManager.getInstance().flush() } catch (e: Exception) {} }
@@ -182,7 +226,8 @@ class YouTubeCarro(val ctx: CarContext) : SurfaceCallback {
 
     private fun armarVista(c: Context): View {
         val r = FrameLayout(c).apply { setBackgroundColor(Color.BLACK) }
-        val w = YouTubeWeb.crear(c, urlActual) { v, cb -> pantallaCompleta(v, cb) }
+        val w = YouTubeWeb.crear(c, urlActual, { v, cb -> pantallaCompleta(v, cb) }, enCarro = true,
+            alEscribir = { pista, clave -> abrirTeclado(pista, clave) }, alLogin = { avisoLogin() })
         r.addView(w, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         val t = TextView(c).apply {
             text = "🚗 Imagen en pausa mientras el carro avanza.\nEl sonido sigue. Al detenerte vuelve la imagen."
@@ -223,6 +268,29 @@ class YouTubeCarro(val ctx: CarContext) : SurfaceCallback {
     }
     fun inicio() { web?.loadUrl(YouTubeWeb.INICIO) }
     fun pausa() { web?.evaluateJavascript(YouTubeWeb.JS_PAUSA, null) }
+    // ---- teclado del carro para escribir en la página
+    private var tecladoAbierto = false
+
+    private fun abrirTeclado(pista: String, clave: Boolean) {
+        if (tecladoAbierto) return
+        tecladoAbierto = true
+        irA(PantallaEscribir(ctx, this, pista, clave))
+    }
+
+    fun escribirEnPagina(texto: String) { web?.evaluateJavascript(YouTubeWeb.jsPoner(texto), null) }
+
+    fun tecladoCerrado() { tecladoAbierto = false; web?.evaluateJavascript("document.activeElement&&document.activeElement.blur()", null) }
+
+    /** En el carro no se inicia sesión de Google (no hay teclado seguro): se hace desde el celular. */
+    private fun avisoLogin() {
+        YouTubeWeb.anotar(ctx, "   ▶ YouTube pidió iniciar sesión en el carro: se indica hacerlo desde el celular")
+        val t = tapa ?: return
+        if (t.visibility == View.VISIBLE) return
+        t.text = "🔑 Para entrar con tu cuenta de YouTube usa el celular:\nJTV → ⋮ → Iniciar sesión de YouTube (carro).\n\nEn el carro sigue sin cuenta."
+        t.visibility = View.VISIBLE
+        main.postDelayed({ aplicarMovimiento() }, 6000)
+    }
+
     fun buscar(texto: String) {
         if (texto.isBlank()) return
         web?.loadUrl("https://m.youtube.com/results?search_query=" + Uri.encode(texto.trim()))
@@ -309,6 +377,28 @@ class PantallaYouTube(ctx: CarContext, private val yt: YouTubeCarro) : Screen(ct
             .addAction(Action.PAN)
         return NavigationTemplate.Builder().setActionStrip(strip.build()).setMapActionStrip(mapa.build()).build()
     }
+}
+
+/** Teclado del carro para escribir en un cuadro de texto de la página (buscar, comentar, etc.). */
+class PantallaEscribir(ctx: CarContext, private val yt: YouTubeCarro, private val pista: String, private val clave: Boolean) : Screen(ctx) {
+    private var listo = false
+    init {
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) { yt.tecladoCerrado() }
+        })
+    }
+    override fun onGetTemplate(): Template =
+        SearchTemplate.Builder(object : SearchTemplate.SearchCallback {
+            override fun onSearchTextChanged(searchText: String) {}
+            override fun onSearchSubmitted(searchText: String) {
+                if (listo) return
+                listo = true
+                yt.escribirEnPagina(searchText); yt.volver()
+            }
+        }).setHeaderAction(Action.BACK).setShowKeyboardByDefault(true)
+            .setSearchHint(if (clave) "Contraseña" else pista.ifBlank { "Escribe aquí" })
+            .setItemList(ItemList.Builder().setNoItemsMessage("Escribe y toca la lupa o Enter").build())
+            .build()
 }
 
 /** Buscar en YouTube con el teclado del carro (o el micrófono del teclado). */
