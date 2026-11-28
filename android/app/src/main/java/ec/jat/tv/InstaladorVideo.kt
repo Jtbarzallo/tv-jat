@@ -102,6 +102,8 @@ object InstaladorVideo {
     val VIDEO = AppCarro("ec.jat.tv.video", "TVJAT-Video.apk", "JTV Video")
     val YOUTUBE = AppCarro("ec.jat.tv.youtube", "TVJAT-YouTube.apk", "JTV YouTube")
     val TODAS = listOf(VIDEO, YOUTUBE)
+    /** La propia app JTV (para el botón 🔄 Actualizar). */
+    val PROPIA = AppCarro("ec.jat.tv", "TVJAT.apk", "JTV")
 
     // lo de siempre (JTV Video)
     val PAQUETE get() = VIDEO.paquete
@@ -118,7 +120,33 @@ object InstaladorVideo {
 
     /** El APK descargado que pide el instalador (por su nombre). */
     fun archivoPorNombre(ctx: Context, nombre: String?): File =
-        (TODAS.firstOrNull { it.archivoApk == nombre } ?: VIDEO).archivo(ctx)
+        ((TODAS + PROPIA).firstOrNull { it.archivoApk == nombre } ?: VIDEO).archivo(ctx)
+
+    /** Número de la versión instalada de un paquete ("1.0.30" → 30); -1 si no está. */
+    fun numeroInstalado(ctx: Context, paquete: String): Int = try {
+        ctx.packageManager.getPackageInfo(paquete, 0).versionName?.substringAfterLast('.')?.toIntOrNull() ?: -1
+    } catch (e: Exception) { -1 }
+
+    /** Número de la última versión publicada en GitHub (v1.0.N → N). Lo pide por internet. */
+    fun numeroUltimo(): Int {
+        val con = (URL("https://api.github.com/repos/Jtbarzallo/tv-jat/releases?per_page=10").openConnection() as HttpURLConnection).apply {
+            connectTimeout = 15000; readTimeout = 20000
+            setRequestProperty("Accept", "application/vnd.github+json")
+        }
+        try {
+            if (con.responseCode != 200) throw Exception("GitHub respondió ${con.responseCode}")
+            val txt = con.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+            val arr = org.json.JSONArray(txt)
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val tag = o.optString("tag_name")
+                if (o.optBoolean("draft") || o.optBoolean("prerelease")) continue
+                if (!tag.startsWith("v1.")) continue          // las de la PC son "pc-v…"
+                return tag.substringAfterLast('.').toIntOrNull() ?: continue
+            }
+            throw Exception("no se encontró la versión del celular")
+        } finally { con.disconnect() }
+    }
 }
 
 /** Entrega el APK descargado al instalador del sistema (solo lectura, sin exponer otros archivos). */

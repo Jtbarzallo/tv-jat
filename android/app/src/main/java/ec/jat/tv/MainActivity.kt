@@ -38,6 +38,7 @@ class MainActivity : Activity() {
         private const val PEDIR_PERMISO_INSTALAR = 10
         private const val PEDIR_DESINSTALAR = 11
         private const val PEDIR_INSTALAR = 12
+        private const val PEDIR_ACTUALIZAR = 13
         private var avisoCarroMostrado = false
         private const val TODOS = "Todos los canales"
         private const val FAVORITOS = "★ Favoritos"
@@ -212,6 +213,125 @@ class MainActivity : Activity() {
         b.show()
     }
 
+    // ---------------- 🔄 actualizar todo desde GitHub con un botón ----------------
+    private var actualizando = false
+    private val colaActualizar = ArrayDeque<AppCarro>()
+    private var numeroNuevo = -1
+
+    /** Botón 🔄: busca la última versión en GitHub y, si hay una nueva, actualiza JTV, JTV Video y JTV YouTube. */
+    private fun buscarActualizacion() {
+        val texto = TextView(this).apply { textSize = 18f; setPadding(50, 40, 50, 40); text = "Buscando la última versión…" }
+        val dlg = AlertDialog.Builder(this).setTitle("🔄 Actualizar").setView(texto).setCancelable(true).show()
+        thread {
+            try {
+                val ultimo = InstaladorVideo.numeroUltimo()
+                val mio = InstaladorVideo.numeroInstalado(this, packageName)
+                // las apps del carro que estén instaladas y viejas
+                val viejas = InstaladorVideo.TODAS.filter {
+                    val n = InstaladorVideo.numeroInstalado(this, it.paquete); n in 0 until ultimo
+                }
+                runOnUiThread {
+                    dlg.dismiss()
+                    if (ultimo <= mio && viejas.isEmpty()) {
+                        AlertDialog.Builder(this).setTitle("✅ Ya tienes la última versión")
+                            .setMessage("JTV 1.0.$mio está al día." +
+                                InstaladorVideo.TODAS.filter { InstaladorVideo.numeroInstalado(this, it.paquete) >= 0 }
+                                    .joinToString("") { "\n${it.nombre} también." })
+                            .setPositiveButton("OK", null).show()
+                        return@runOnUiThread
+                    }
+                    val lista = viejas.map { "• ${it.nombre}" } + (if (ultimo > mio) listOf("• JTV (esta app, va al final)") else emptyList())
+                    AlertDialog.Builder(this).setTitle("🆕 Hay una versión nueva: 1.0.$ultimo")
+                        .setMessage("Tienes la 1.0.$mio. Se va a actualizar:\n" + lista.joinToString("\n") +
+                            "\n\nSolo toca \"Actualizar\" o \"Instalar\" en cada ventana que salga. " +
+                            "Tus canales, favoritos y películas no se borran.")
+                        .setPositiveButton("Actualizar") { _, _ ->
+                            numeroNuevo = ultimo
+                            colaActualizar.clear(); colaActualizar.addAll(viejas)
+                            if (ultimo > mio) colaActualizar.addLast(InstaladorVideo.PROPIA)
+                            actualizando = true
+                            Registro.anotar(this, "🔄 Actualizar a 1.0.$ultimo: " + colaActualizar.joinToString { it.nombre })
+                            siguienteActualizacion()
+                        }
+                        .setNegativeButton("Después", null).show()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    dlg.dismiss()
+                    AlertDialog.Builder(this).setTitle("No se pudo revisar")
+                        .setMessage("Revisa que tengas internet y vuelve a intentar.\n\n(${e.message})")
+                        .setPositiveButton("Reintentar") { _, _ -> buscarActualizacion() }
+                        .setNegativeButton("Cerrar", null).show()
+                }
+            }
+        }
+    }
+
+    /** Instala la siguiente app de la cola (las del carro primero, JTV al final). */
+    private fun siguienteActualizacion() {
+        if (android.os.Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            AlertDialog.Builder(this)
+                .setTitle("Falta un permiso")
+                .setMessage("En la pantalla que se abre, activa \"Permitir desde esta fuente\" para JTV y luego regresa con la flecha ←.")
+                .setPositiveButton("Abrir") { _, _ ->
+                    startActivityForResult(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:$packageName")), PEDIR_PERMISO_INSTALAR)
+                }
+                .setNegativeButton("Cancelar") { _, _ -> actualizando = false }
+                .show()
+            return
+        }
+        val ap = colaActualizar.removeFirstOrNull()
+        if (ap == null) {
+            actualizando = false
+            AlertDialog.Builder(this).setTitle("✅ Listo")
+                .setMessage("Todo quedó actualizado a la versión 1.0.$numeroNuevo.\n\nSi estás conectado al carro, desconecta y vuelve a conectar el celular.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        appEnCurso = ap
+        val texto = TextView(this).apply { textSize = 18f; setPadding(50, 40, 50, 40); text = "Descargando ${ap.nombre}… 0 %" }
+        val dlg = AlertDialog.Builder(this).setTitle("🔄 Actualizando").setView(texto).setCancelable(false).show()
+        thread {
+            try {
+                ap.descargar(this) { p -> runOnUiThread { texto.text = "Descargando ${ap.nombre}… $p %" } }
+                runOnUiThread {
+                    dlg.dismiss()
+                    if (ap === InstaladorVideo.PROPIA) instalarEstaApp() else lanzarInstalador(ap)
+                }
+            } catch (ex: Exception) {
+                runOnUiThread {
+                    dlg.dismiss()
+                    actualizando = false
+                    AlertDialog.Builder(this).setTitle("No se pudo descargar ${ap.nombre}")
+                        .setMessage("Revisa que tengas internet y vuelve a intentar con 🔄.\n\n(${ex.message})")
+                        .setPositiveButton("OK", null).show()
+                }
+            }
+        }
+    }
+
+    /** Actualiza la propia JTV (al terminar, JTV se cierra; ábrela otra vez). */
+    private fun instalarEstaApp() {
+        val uri = InstaladorVideo.PROPIA.uriApk
+        Registro.anotar(this, "🔄 Instalando JTV 1.0.$numeroNuevo")
+        @Suppress("DEPRECATION")
+        val i = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+            putExtra(Intent.EXTRA_RETURN_RESULT, true)
+        }
+        AlertDialog.Builder(this).setTitle("Último paso: JTV")
+            .setMessage("Ahora se actualiza esta app. Al terminar JTV se cierra: ábrela otra vez y ya está.")
+            .setPositiveButton("Continuar") { _, _ ->
+                try { startActivityForResult(i, PEDIR_ACTUALIZAR) } catch (e: Exception) {
+                    actualizando = false; aviso("No se pudo abrir el instalador: ${e.message}")
+                }
+            }
+            .setCancelable(false).show()
+    }
+
     /** Menú: poner una app del carro (o reinstalarla para actualizarla). */
     private fun ponerAppCarro(ap: AppCarro) {
         val e = ap.estado(this)
@@ -257,6 +377,8 @@ class MainActivity : Activity() {
         }
         btnListas.setOnClickListener { menuListas(it) }
         cabecera.addView(btnListas, LinearLayout.LayoutParams(-2, dp(44)).apply { marginStart = dp(8) })
+        val btnAct = Jtv.botonIcono(this, "🔄") { buscarActualizacion() }
+        cabecera.addView(btnAct, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginStart = dp(8) })
         val btnMas = Jtv.botonIcono(this, "⋮") {}
         btnMas.setOnClickListener { menuMas(it) }
         cabecera.addView(btnMas, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginStart = dp(8) })
@@ -467,6 +589,7 @@ class MainActivity : Activity() {
         val menu = PopupMenu(this, ancla)
         menu.menu.add(0, 8, 0, "🚗 Poner JTV Video en el carro")
         menu.menu.add(0, 9, 0, "🎤 Activar micrófono del carro")
+        menu.menu.add(0, 13, 0, "🔄 Buscar actualización")
         menu.menu.add(0, 10, 0, "🎵 Iniciar sesión de TikTok (carro)")
         menu.menu.add(0, 11, 0, "▶ Poner JTV YouTube en el carro")
         menu.menu.add(0, 12, 0, "▶ Iniciar sesión de YouTube (carro)")
@@ -510,6 +633,7 @@ class MainActivity : Activity() {
                     } catch (e2: Exception) { aviso("Primero instala JTV Video: ⋮ → Poner JTV Video en el carro") }
                 }
                 8 -> ponerAppCarro(InstaladorVideo.VIDEO)
+                13 -> buscarActualizacion()
                 11 -> ponerAppCarro(InstaladorVideo.YOUTUBE)
                 12 -> try {
                     startActivity(Intent().setClassName("ec.jat.tv.youtube", "ec.jat.tv.YouTubeLoginActivity"))
@@ -588,7 +712,8 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
             PEDIR_PERMISO_INSTALAR -> {
-                if (android.os.Build.VERSION.SDK_INT >= 26 && packageManager.canRequestPackageInstalls()) instalarApp(appEnCurso)
+                if (actualizando && android.os.Build.VERSION.SDK_INT >= 26 && packageManager.canRequestPackageInstalls()) siguienteActualizacion()
+                else if (android.os.Build.VERSION.SDK_INT >= 26 && packageManager.canRequestPackageInstalls()) instalarApp(appEnCurso)
                 else aviso("Falta activar el permiso para que JTV pueda instalar")
                 return
             }
@@ -597,7 +722,12 @@ class MainActivity : Activity() {
                 else aviso("No se quitó la versión anterior. Vuelve a intentar.")
                 return
             }
-            PEDIR_INSTALAR -> { resultadoApp(appEnCurso); return }
+            PEDIR_INSTALAR -> {
+                if (actualizando) { Registro.anotar(this, "🔄 " + appEnCurso.resumen(this)); siguienteActualizacion() }
+                else resultadoApp(appEnCurso)
+                return
+            }
+            PEDIR_ACTUALIZAR -> { actualizando = false; return }
         }
         val uri = data?.data ?: return
         if (resultCode != RESULT_OK) return

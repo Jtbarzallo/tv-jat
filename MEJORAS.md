@@ -255,3 +255,8 @@
      directa" (al tocar, el video tenía que volver a la pantalla normal con ~0,5 s de espera; además el video ahora
      tiene que achicarse junto a la franja, y eso solo se puede en la pantalla normal).
   Respaldo: sin datos nuevos.
+- 2026-11-27: Jorge pide un botón para actualizar sin buscar el link en GitHub → v1.28: botón 🔄 en la cabecera de
+  JTV (y ⋮ → "🔄 Buscar actualización"). Revisa la última versión del celular en GitHub (ignora las "pc-v…"),
+  compara con lo instalado y actualiza en cola: primero JTV Video y JTV YouTube (si están instaladas y viejas, como
+  "de Google Play" para que Android Auto las siga mostrando) y al final la propia JTV (se cierra al terminar; se abre
+  otra vez). Si ya está todo al día, lo dice. Respaldo: sin datos nuevos (actualizar no borra datos).
