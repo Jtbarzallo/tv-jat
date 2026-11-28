@@ -54,4 +54,5 @@ android {
 dependencies {
     implementation("androidx.car.app:app:1.4.0")
     implementation("androidx.lifecycle:lifecycle-common:2.6.2")
+    implementation("androidx.webkit:webkit:1.12.1")
 }

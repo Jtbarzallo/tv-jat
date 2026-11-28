@@ -28,6 +28,8 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.car.app.AppManager
@@ -97,6 +99,13 @@ object YouTubeWeb {
         settings.domStorageEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
         settings.setSupportMultipleWindows(false)
+        // Google no deja iniciar sesión si detecta que es una ventana dentro de una app ("Se produjo un error"):
+        // se presenta como Chrome normal (sin la marca "; wv" ni "Version/4.0") y sin el aviso X-Requested-With.
+        settings.userAgentString = comoChrome(settings.userAgentString)
+        try {
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST))
+                WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())
+        } catch (e: Throwable) {}
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
         webChromeClient = object : WebChromeClient() {
@@ -124,6 +133,13 @@ object YouTubeWeb {
             fun escribir(tipo: String, pista: String) { Handler(Looper.getMainLooper()).post { alEscribir(pista, tipo == "password") } }
         }, "JTVTeclado")
         loadUrl(inicio)
+    }
+
+    /** Quita del nombre del navegador lo que delata que es una ventana dentro de una app. */
+    fun comoChrome(ua: String?): String {
+        val u = (ua ?: "").replace("; wv)", ")").replace(Regex("Version/[\\d.]+ "), "")
+        return if (u.contains("Chrome/")) u
+        else "Mozilla/5.0 (Linux; Android 13; Redmi Note 11) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
     }
 
     /** Avisa cuando se toca un cuadro de texto de la página (para abrir el teclado del carro). */

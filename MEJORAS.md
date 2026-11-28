@@ -285,3 +285,9 @@
   nombre del módulo (ec.jat.tv.youtube… / ec.jat.tv.video…), pero las clases están en ec.jat.tv → v1.32: nombres
   completos. Arregla también "Iniciar sesión de TikTok (carro)" y la pantalla de permisos de JTV Video.
   OJO: el botón 🔄 debe actualizar también JTV Video y JTV YouTube para que funcione. Respaldo: sin datos nuevos.
+- 2026-11-28: Jorge (capturas): al iniciar sesión de YouTube desde el celular (JTV → ⋮ → Iniciar sesión de YouTube),
+  Google pidió "Revisa tu Redmi Note 11" (tocar el 20), el número no coincidía y luego salió "Se produjo un error".
+  Causa: Google detecta que es una ventana dentro de una app (marca "; wv" y "Version/4.0" en el nombre del navegador
+  y el aviso X-Requested-With) y no deja terminar el inicio de sesión → v1.33 (JTV YouTube): la ventana se presenta
+  como Chrome normal (quita esas marcas; librería androidx.webkit 1.12.1 para quitar el aviso). Vale para el celular y
+  el carro (misma sesión). Respaldo: sin datos nuevos.
