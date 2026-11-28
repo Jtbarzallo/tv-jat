@@ -270,7 +270,9 @@ class Grabacion(val url: String, private val ua: String, private val referer: St
             }
             val conUri = medios.filter { atributo(it, "URI") != null }
             val audio = conUri.firstOrNull { atributo(it, "DEFAULT") == "YES" } ?: conUri.firstOrNull()
-            if (audio != null) return prepararDoble(elegida.u, resolver(fin, sinComillas(atributo(audio, "URI"))!!), elegida.inf, audio)
+            // v1.29: los canales con el audio aparte (Pluto TV y otros) vuelven a verse directo. Grabados en dos
+            // pistas se quedaban en "Cargando…" (el audio y el video no siempre van con la misma numeración).
+            if (audio != null) { Grabador.anotar("el canal trae el audio aparte: se ve directo"); return false }
         }
         return prepararSimple(elegida.u)
     }

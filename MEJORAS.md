@@ -260,3 +260,9 @@
   compara con lo instalado y actualiza en cola: primero JTV Video y JTV YouTube (si están instaladas y viejas, como
   "de Google Play" para que Android Auto las siga mostrando) y al final la propia JTV (se cierra al terminar; se abre
   otra vez). Si ya está todo al día, lo dice. Respaldo: sin datos nuevos (actualizar no borra datos).
+- 2026-11-27: Jorge manda captura (Comedy Central en Español, Pluto TV): "la línea de tiempo funciona mal, me está
+  guardando el video y por eso se detiene a cargar" (grabado 0:10, "Cargando…"). Causa: la grabación en dos pistas
+  (video y audio aparte) de v1.23 — el audio y el video no siempre llevan la misma numeración y se trababa → v1.29:
+  los canales con audio aparte vuelven a verse DIRECTO (como antes de v1.23); la barra sigue con el margen de 20 s y
+  la vuelta sola al EN VIVO si un salto no carga. Además el botón Apagar ahora es un ícono (el símbolo ⏻ salía como
+  un cuadrito en el celular). Respaldo: sin datos nuevos.

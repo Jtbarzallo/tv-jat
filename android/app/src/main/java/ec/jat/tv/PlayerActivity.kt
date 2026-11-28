@@ -315,7 +315,7 @@ class PlayerActivity : Activity() {
         val ant = boton(R.drawable.ic_anterior_jat, "", "Anterior", BOTON, Color.WHITE, 46) { anterior() }
         val pau = boton(R.drawable.ic_pausa_jat, "", "Pausa", Color.WHITE, ROJO, 58) { pausaSigue() }
         val sig = boton(R.drawable.ic_siguiente_jat, "", "Siguiente", BOTON, Color.WHITE, 46) { siguiente() }
-        val cer = boton(0, "⏻", "Apagar", ROJO, Color.WHITE, 46) { apagar() }
+        val cer = boton(R.drawable.ic_apagar, "", "Apagar", ROJO, Color.WHITE, 46) { apagar() }
         listOf(guia, ant, pau, sig, cer).forEach { controles.addView(it.vista, lpB) }
         btnPausa = pau.icono!!
         abajo.addView(controles)

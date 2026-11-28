@@ -898,7 +898,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val ant = boton(c, R.drawable.ic_anterior, "", "Anterior", BOTON, Color.WHITE, 48) { anterior() }
         val pau = boton(c, R.drawable.ic_pausa, "", "Pausa", Color.WHITE, ROJO, 60) { pausaSigue(); actualizarCapa() }
         val sig = boton(c, R.drawable.ic_siguiente, "", "Siguiente", BOTON, Color.WHITE, 48) { siguiente() }
-        val cer = boton(c, 0, "⏻", "Apagar", ROJO, Color.WHITE, 48) { cerrar() }
+        val cer = boton(c, R.drawable.ic_apagar, "", "Apagar", ROJO, Color.WHITE, 48) { cerrar() }
         listOf(guia, ant, pau, sig, cer).forEach { controles.addView(it.vista, lpB) }
         abajo.addView(controles)
 
