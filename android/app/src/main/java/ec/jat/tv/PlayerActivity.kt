@@ -268,13 +268,13 @@ class PlayerActivity : Activity() {
         }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
         cp.addView(arriba, FrameLayout.LayoutParams(-1, dp(52), Gravity.TOP))
 
-        // ---- lista al costado derecho
+        // ---- lista en franja aparte, a la izquierda (no va encima del video; igual que en el carro)
         val pn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = Jtv.forma(this@PlayerActivity, 18f, 14f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.93f), Jtv.conAlfa(Jtv.NAVY, 0.95f)), Jtv.LINEA, 1.2f)
-            clipToOutline = true
-            elevation = dp(8).toFloat()
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Jtv.SUPERFICIE2, Jtv.NAVY, Jtv.FONDO))
+            visibility = View.GONE
             isClickable = true
+            setOnClickListener { tocado() }
         }
         listaTitulo = TextView(this).apply {
             setTextColor(ACENTO)
@@ -299,10 +299,8 @@ class PlayerActivity : Activity() {
             })
         }
         pn.addView(lista, LinearLayout.LayoutParams(-1, 0, 1f))
-        val anchoPanel = (resources.displayMetrics.widthPixels * 0.36f).toInt().coerceAtLeast(dp(250))
-        cp.addView(pn, FrameLayout.LayoutParams(anchoPanel, -1, Gravity.END or Gravity.TOP).apply {
-            topMargin = dp(54); bottomMargin = dp(150); rightMargin = dp(8)
-        })
+        raiz.addView(pn, FrameLayout.LayoutParams(anchoFranja(), -1, Gravity.START or Gravity.TOP))
+        franja = pn
 
         // ---- abajo: botones redondos + barra de información
         val abajo = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setOnClickListener { tocado() } }
@@ -313,11 +311,11 @@ class PlayerActivity : Activity() {
             setPadding(dp(8), dp(10), dp(8), dp(6))
         }
         val lpB = LinearLayout.LayoutParams(0, -2, 1f)
-        val guia = boton(0, "☰", "Guía", BOTON, Color.WHITE, 46) { vistaPanel = "grupos"; pintarPanel() }
+        val guia = boton(0, "☰", "Lista", BOTON, Color.WHITE, 46) { alternarLista() }
         val ant = boton(R.drawable.ic_anterior_jat, "", "Anterior", BOTON, Color.WHITE, 46) { anterior() }
         val pau = boton(R.drawable.ic_pausa_jat, "", "Pausa", Color.WHITE, ROJO, 58) { pausaSigue() }
         val sig = boton(R.drawable.ic_siguiente_jat, "", "Siguiente", BOTON, Color.WHITE, 46) { siguiente() }
-        val cer = boton(0, "✕", "Cerrar", ROJO, Color.WHITE, 46) { finish() }
+        val cer = boton(0, "⏻", "Apagar", ROJO, Color.WHITE, 46) { apagar() }
         listOf(guia, ant, pau, sig, cer).forEach { controles.addView(it.vista, lpB) }
         btnPausa = pau.icono!!
         abajo.addView(controles)
@@ -418,7 +416,72 @@ class PlayerActivity : Activity() {
 
     // ---- mostrar / esconder
     private val ocultarSolo = Runnable { if (player?.isPlaying == true) ocultarCapa() else tocado() }
-    private fun tocado() { manejador.removeCallbacks(ocultarSolo); if (capaVisible) manejador.postDelayed(ocultarSolo, 8000) }
+    private fun tocado() { manejador.removeCallbacks(ocultarSolo); if (capaVisible) manejador.postDelayed(ocultarSolo, 8000); tocarLista() }
+
+    // ---- lista en franja aparte (izquierda), igual que en el carro
+    private var franja: View? = null
+    private var listaVisible = false
+    private val aOcultarLista = Runnable { if (vistaPanel == "voz") tocarLista() else ocultarLista() }
+
+    private fun anchoFranja(): Int {
+        val w = resources.displayMetrics.widthPixels
+        return (w * 0.34f).toInt().coerceAtLeast(dp(230)).coerceAtMost((w * 0.6f).toInt())
+    }
+
+    /** Cada vez que se usa la lista: se esconde sola a los 3 s sin usarla. */
+    private fun tocarLista() {
+        manejador.removeCallbacks(aOcultarLista)
+        if (listaVisible) manejador.postDelayed(aOcultarLista, 3000)
+    }
+
+    /** Botón "Lista": la muestra o la esconde. */
+    private fun alternarLista() {
+        if (listaVisible) { ocultarLista(); return }
+        vistaPanel = "canales"
+        pintarPanel()
+    }
+
+    private fun mostrarLista() {
+        val f = franja ?: return
+        listaVisible = true
+        f.visibility = View.VISIBLE
+        ajustarFranja()
+        tocarLista()
+    }
+
+    private fun ocultarLista() {
+        manejador.removeCallbacks(aOcultarLista)
+        if (!listaVisible) return
+        listaVisible = false
+        franja?.visibility = View.GONE
+        ajustarFranja()
+    }
+
+    /** El video y los controles se corren a la derecha cuando está la lista. */
+    private fun ajustarFranja() {
+        val w = anchoFranja()
+        franja?.let { (it.layoutParams as FrameLayout.LayoutParams).width = w; it.requestLayout() }
+        val izq = if (listaVisible) w else 0
+        for (v in listOf<View?>(vista, capa)) v?.let {
+            val lp = it.layoutParams as FrameLayout.LayoutParams
+            lp.setMargins(izq, 0, 0, 0)
+            it.layoutParams = lp
+        }
+    }
+
+    /** Botón "⏻ Apagar": para el video, el sonido y la grabación, y cierra la app. */
+    private fun apagar() {
+        Registro.anotar(this, "⏻ JTV apagado con el botón Apagar")
+        try { if (enTv) { Transmitir.detener(this); enTv = false } } catch (e: Exception) {}
+        try { player?.stop() } catch (e: Exception) {}
+        Grabador.detener()
+        finishAffinity()
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        ajustarFranja()
+    }
 
     private val refresco = object : Runnable {
         override fun run() {
@@ -431,8 +494,8 @@ class PlayerActivity : Activity() {
     private fun mostrarCapa() {
         if (isInPictureInPictureMode) return
         capaVisible = true
-        pintarPanel()
-        capa.visibility = View.VISIBLE
+        actualizarCapa()
+        capa.visibility = View.VISIBLE      // solo los controles; la lista sale con el botón Lista
         tocado()
         manejador.removeCallbacks(refresco); manejador.post(refresco)
     }
@@ -440,6 +503,7 @@ class PlayerActivity : Activity() {
     private fun ocultarCapa() {
         capa.visibility = View.GONE
         capaVisible = false
+        ocultarLista()
         manejador.removeCallbacks(ocultarSolo); manejador.removeCallbacks(refresco)
         if (enTv) capaTv.visibility = View.VISIBLE
     }
@@ -453,7 +517,15 @@ class PlayerActivity : Activity() {
     private fun favoritos(): Set<String> = favMem ?: Datos.favoritos(this).toSet().also { favMem = it }
     private fun grupoDe(c: Canal) = c.grupo.ifBlank { "Otros" }
 
+    /** Pinta la lista y la muestra (si estaba escondida). */
     private fun pintarPanel() {
+        repintarLista()
+        if (!capaVisible) mostrarCapa()
+        if (!listaVisible) mostrarLista() else tocarLista()
+    }
+
+    /** Solo vuelve a pintar la lista (sin mostrarla). */
+    private fun repintarLista() {
         favMem = null
         val f = ArrayList<Fila>()
         val fav = favoritos()
@@ -668,7 +740,7 @@ class PlayerActivity : Activity() {
         val ahora = Datos.cambiarFavorito(this, c.url)
         favMem = null
         avisoBreve(if (ahora) "★ ${c.nombre}\nagregado a Favoritos" else "☆ ${c.nombre}\nquitado de Favoritos")
-        pintarPanel()
+        if (listaVisible) repintarLista() else actualizarCapa()
     }
 
     private fun calidadTexto() = when (calidadMem) { "alta" -> "1080p"; "ahorro" -> "480p"; else -> "720p" }
@@ -685,7 +757,7 @@ class PlayerActivity : Activity() {
         Datos.setCalidad(this, calidadMem)
         aplicarCalidad()
         avisoBreve("📶 Calidad ${calidadTexto()}")
-        if (vistaPanel == "opciones") pintarPanel() else actualizarCapa()
+        if (listaVisible && vistaPanel == "opciones") repintarLista() else actualizarCapa()
     }
 
     private fun cambiarTamano() {
@@ -787,10 +859,10 @@ class PlayerActivity : Activity() {
             ponerCanal(primero.first)
             avisoBreve("🎤 ${primero.first.nombre}")
             vistaPanel = "canales"
-            if (capaVisible) pintarPanel()
+            if (listaVisible) repintarLista()
         } else {
             vistaPanel = "voz"
-            mostrarCapa()
+            pintarPanel()
         }
     }
 
@@ -859,7 +931,8 @@ class PlayerActivity : Activity() {
                 canalActual?.let { Datos.guardarUltimo(this@PlayerActivity, it.url) }
                 if (enTv) { enviarCanalTv(); return }
                 if (p.playbackState == Player.STATE_IDLE) p.prepare()
-                if (capaVisible) pintarPanel() else {
+                if (listaVisible) repintarLista()
+                if (!capaVisible) {
                     canalActual?.let { avisoBreve("📺 ${it.nombre}") }
                 }
             }
@@ -966,7 +1039,7 @@ class PlayerActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (capaVisible && vistaPanel != "canales") { vistaPanel = "canales"; pintarPanel(); return }
+        if (listaVisible) { ocultarLista(); return }
         if (enTv) {
             AlertDialog.Builder(this)
                 .setTitle("¿Dejar de ver en la TV?")

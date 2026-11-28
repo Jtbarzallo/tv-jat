@@ -243,3 +243,15 @@
   un navegador de app; si pasa, YouTube funciona sin cuenta (Jorge no respondió esa pregunta; se tomó la opción
   recomendada: versión para celular y seguir sin cuenta si Google bloquea). Seguridad: usa el mismo "modo pasajero"
   de JTV. Respaldo: la sesión son cookies de YouTube/Google; no hay datos de Jorge que respaldar.
+- 2026-11-27: Jorge: "al tocar la pantalla no reacciona enseguida", quiere la lista de canales en una franja aparte (no
+  encima del video) y un botón para apagar la app; aclaró: en el celular y en el carro (el celular debe funcionar igual
+  que el carro para probar sin estar en el carro), la lista solo sale con un botón "Lista" y se esconde sola a los 3 s
+  si no se usa, a la izquierda, y un botón de apagado. → v1.27 (celular y carro):
+  1) lista en franja a la IZQUIERDA; el video y los controles se corren a la derecha (no se tapa el video);
+  2) tocar el video solo muestra los controles; la lista sale con "☰ Lista" (o 📺 Canales / ⚙ Ajustes / 🎤 Voz) y se
+     esconde sola a los 3 s sin usarla (no mientras se escucha la voz);
+  3) "✕ Cerrar" pasa a "⏻ Apagar": para video, sonido y grabación y cierra la app (en el carro cierra JTV Video);
+  4) toques más rápidos: ya no se arma la lista cada vez que se toca la pantalla, y en el carro se apagó la "salida
+     directa" (al tocar, el video tenía que volver a la pantalla normal con ~0,5 s de espera; además el video ahora
+     tiene que achicarse junto a la franja, y eso solo se puede en la pantalla normal).
+  Respaldo: sin datos nuevos.

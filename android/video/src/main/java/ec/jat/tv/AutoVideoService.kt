@@ -251,7 +251,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 yaArranco = false
                 reintentoPantalla = false
-                if (panelVisible) pintarPanel()
+                if (listaVisible) repintarLista()
                 val i = player.currentMediaItemIndex
                 if (modo == Modo.CANALES) {
                     val c = canalesLista.getOrNull(i) ?: return
@@ -622,11 +622,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             lp.setMargins(r.left, r.top, maxOf(0, ancho - r.right), maxOf(0, alto - r.bottom))
             v.layoutParams = lp
         }
-        panel?.let { v ->
-            val lp = v.layoutParams as FrameLayout.LayoutParams
-            lp.width = (r.width() * 0.36f).toInt().coerceAtLeast(dp(v.context, 230)).coerceAtMost((r.width() * 0.5f).toInt())
-            v.layoutParams = lp
-        }
+        ajustarFranja()
         titulo?.let { v ->
             val lp = v.layoutParams as FrameLayout.LayoutParams
             lp.setMargins(r.left + 12, r.top + 12, 0, 0)
@@ -658,6 +654,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         infoNombre = null; infoSub = null; infoTiempo = null; infoVivo = null; infoCalidad = null; barra = null; estrella = null
         filasLogo.clear(); filaMarcada = null; filasAccion.clear(); cursor = -1
         panelVisible = false
+        listaVisible = false; main.removeCallbacks(aOcultarLista)
         main.removeCallbacks(refresco); main.removeCallbacks(ocultarSolo); main.removeCallbacks(revisarImagen)
         superficie = null; directa = false
     }
@@ -734,7 +731,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     fun cambiarAjuste() {
         Datos.setAjusteImagen(ctx, if (Datos.ajusteImagen(ctx) == "entera") "completa" else "entera")
         vista?.resizeMode = modoAjuste()
-        if (panelVisible) pintarPanel()
+        if (listaVisible) repintarLista()
     }
 
     // calidad máxima de la imagen (menos calidad = menos datos y menos cortes)
@@ -752,7 +749,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         calidadMem = sig
         aplicarCalidad()
         ponerAviso(""); actualizarCapa()
-        if (panelVista == "opciones") pintarPanel()
+        if (listaVisible && panelVista == "opciones") repintarLista()
     }
 
     private fun redondo(color: Int, radio: Float = -1f) = GradientDrawable().apply {
@@ -861,11 +858,11 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         })
         cp.addView(arriba, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(c, 50), Gravity.TOP))
 
-        // ---- lista al costado derecho
+        // ---- lista en franja aparte, a la izquierda (no va encima del video)
         val pn = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            background = Jtv.forma(c, 18f, 14f, intArrayOf(Jtv.conAlfa(Jtv.SUPERFICIE2, 0.93f), Jtv.conAlfa(Jtv.NAVY, 0.95f)), Jtv.LINEA, 1.2f)
-            clipToOutline = true
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Jtv.SUPERFICIE2, Jtv.NAVY, Jtv.FONDO))
+            visibility = View.GONE
             setOnClickListener { tocado() }
         }
         val tt = TextView(c).apply {
@@ -886,9 +883,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         val ll = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
         sv.addView(ll)
         pn.addView(sv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        cp.addView(pn, FrameLayout.LayoutParams((ancho * 0.36f).toInt().coerceAtLeast(dp(c, 230)), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END or Gravity.TOP).apply {
-            topMargin = dp(c, 52); bottomMargin = dp(c, 150); rightMargin = dp(c, 8)
-        })
+        raiz.addView(pn, FrameLayout.LayoutParams((ancho * 0.34f).toInt().coerceAtLeast(dp(c, 230)), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START or Gravity.TOP))
 
         // ---- abajo: botones redondos + barra de información
         val abajo = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL; setOnClickListener { tocado() } }
@@ -899,11 +894,11 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             setPadding(dp(c, 8), dp(c, 10), dp(c, 8), dp(c, 6))
         }
         val lpB = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-        val guia = boton(c, 0, "☰", "Guía", BOTON, Color.WHITE, 48) { panelVista = "grupos"; pintarPanel() }
+        val guia = boton(c, 0, "☰", "Lista", BOTON, Color.WHITE, 48) { alternarLista() }
         val ant = boton(c, R.drawable.ic_anterior, "", "Anterior", BOTON, Color.WHITE, 48) { anterior() }
         val pau = boton(c, R.drawable.ic_pausa, "", "Pausa", Color.WHITE, ROJO, 60) { pausaSigue(); actualizarCapa() }
         val sig = boton(c, R.drawable.ic_siguiente, "", "Siguiente", BOTON, Color.WHITE, 48) { siguiente() }
-        val cer = boton(c, 0, "✕", "Cerrar TV", ROJO, Color.WHITE, 48) { cerrar() }
+        val cer = boton(c, 0, "⏻", "Apagar", ROJO, Color.WHITE, 48) { cerrar() }
         listOf(guia, ant, pau, sig, cer).forEach { controles.addView(it.vista, lpB) }
         abajo.addView(controles)
 
@@ -1157,7 +1152,14 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         } else ll.addView(View(c).apply { setBackgroundColor(Jtv.conAlfa(Jtv.CIELO, 0.10f)) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
     }
 
+    /** Pinta la lista y la muestra (si estaba escondida). */
     fun pintarPanel() {
+        repintarLista()
+        if (!listaVisible) mostrarLista() else tocarLista()
+    }
+
+    /** Solo vuelve a pintar la lista (sin mostrarla). */
+    fun repintarLista() {
         val ll = panelLista ?: return
         ll.removeAllViews()
         filasLogo.clear(); filaMarcada = null
@@ -1273,7 +1275,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     /** Botones ▲ ▼ del carro: mueven el cuadro blanco por la lista. */
     fun moverCursor(d: Int) {
-        if (!panelVisible) { mostrarPanel(); return }
+        if (!listaVisible) { alternarLista(); return }
         if (filasAccion.isEmpty()) return
         usaCursor = true
         cursor = (cursor + d).coerceIn(0, filasAccion.size - 1)
@@ -1282,7 +1284,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     /** Botón ✓ del carro: elige la fila del cuadro blanco. */
     fun elegirCursor() {
-        if (!panelVisible) { mostrarPanel(); return }
+        if (!listaVisible) { alternarLista(); return }
         val f = filasAccion.getOrNull(cursor) ?: return
         f.second(); tocado()
     }
@@ -1358,7 +1360,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         }
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
             avisoBreve("Este celular no tiene reconocimiento de voz")
-            vozTexto = ""; vozResultados = emptyList(); panelVista = "voz"; if (panelVisible) pintarPanel() else mostrarPanel()
+            vozTexto = ""; vozResultados = emptyList(); panelVista = "voz"; pintarPanel()
             return
         }
         // primero el micrófono del carro; si no se puede, el del celular
@@ -1512,18 +1514,83 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
             ponerCanales(todos, todos.indexOf(primero.first))
             avisoBreve("🎤 ${primero.first.nombre}")
             panelVista = "canales"
-            if (panelVisible) pintarPanel()
+            if (listaVisible) repintarLista()
         } else {
             // varios parecidos (o ninguno): se muestran para elegir
             panelVista = "voz"
-            if (panelVisible) pintarPanel() else mostrarPanel()
+            pintarPanel()
         }
         alCambiar?.invoke()
     }
 
     /** Se esconde sola a los 12 s sin tocar (si está en pausa se queda). */
     private val ocultarSolo = Runnable { if (player.isPlaying && !escuchando) ocultarPanel() else tocado() }
-    private fun tocado() { main.removeCallbacks(ocultarSolo); if (panelVisible) main.postDelayed(ocultarSolo, 12_000) }
+    private fun tocado() { main.removeCallbacks(ocultarSolo); if (panelVisible) main.postDelayed(ocultarSolo, 12_000); tocarLista() }
+
+    // ------------------------------------------------------------------ lista en franja aparte (izquierda)
+    /** La lista de canales va en una franja a la izquierda; el video se corre a la derecha (no se tapa). */
+    var listaVisible = false
+        private set
+    private val aOcultarLista = Runnable { if (escuchando || panelVista == "voz") tocarLista() else ocultarLista() }
+
+    /** Cada vez que se usa la lista: se esconde sola a los 3 s sin usarla. */
+    private fun tocarLista() {
+        main.removeCallbacks(aOcultarLista)
+        if (listaVisible) main.postDelayed(aOcultarLista, 3000)
+    }
+
+    /** Botón "Lista": la muestra o la esconde. */
+    fun alternarLista() {
+        if (listaVisible) { ocultarLista(); return }
+        panelVista = if (modo == Modo.PELICULAS) (if (carpetaSel.isNotEmpty()) "carpeta" else "pelis") else "canales"
+        pintarPanel()
+    }
+
+    private fun mostrarLista() {
+        val pn = panel
+        if (pn == null) { irA(PantallaMenu(ctx, this)); return }   // forma B: no hay dónde dibujar
+        listaVisible = true
+        pn.visibility = View.VISIBLE
+        ajustarFranja()
+        tocarLista()
+        revisarSalida()
+        alCambiar?.invoke()
+    }
+
+    fun ocultarLista() {
+        main.removeCallbacks(aOcultarLista)
+        if (!listaVisible) return
+        listaVisible = false
+        usaCursor = false
+        panel?.visibility = View.GONE
+        ajustarFranja()
+        revisarSalida()
+        alCambiar?.invoke()
+    }
+
+    /** Acomoda la franja, el video y los controles según la lista esté o no. */
+    private fun ajustarFranja() {
+        if (ancho <= 0 || alto <= 0) return
+        val r = areaUsable()
+        val pn = panel ?: return
+        val w = (r.width() * 0.34f).toInt().coerceAtLeast(dp(pn.context, 230)).coerceAtMost((r.width() * 0.5f).toInt())
+        (pn.layoutParams as FrameLayout.LayoutParams).let { lp ->
+            lp.width = w
+            lp.setMargins(r.left, r.top, 0, maxOf(0, alto - r.bottom))
+            pn.layoutParams = lp
+        }
+        val izq = if (listaVisible) r.left + w else 0
+        vista?.let { v ->
+            val lp = v.layoutParams as FrameLayout.LayoutParams
+            lp.setMargins(izq, 0, 0, 0)
+            v.layoutParams = lp
+        }
+        capa?.let { v ->
+            val lp = v.layoutParams as FrameLayout.LayoutParams
+            lp.setMargins(if (listaVisible) izq else r.left, r.top, maxOf(0, ancho - r.right), maxOf(0, alto - r.bottom))
+            v.layoutParams = lp
+        }
+    }
 
     fun mostrarPanel() {
         val cp = capa
@@ -1532,8 +1599,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         if (panelVista == "carpeta" && carpetaSel.isEmpty()) panelVista = "pelis"
         panelVisible = true
         titulo?.visibility = View.GONE
-        pintarPanel()
-        cp.visibility = View.VISIBLE
+        cp.visibility = View.VISIBLE      // solo los controles; la lista sale con el botón Lista
         tocado()
         main.removeCallbacks(refresco); main.post(refresco)
         revisarSalida()
@@ -1543,6 +1609,7 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     fun ocultarPanel() {
         capa?.visibility = View.GONE
         panelVisible = false
+        ocultarLista()
         usaCursor = false
         main.removeCallbacks(ocultarSolo); main.removeCallbacks(refresco)
         revisarSalida()
@@ -1554,12 +1621,15 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
     // cuadros. Por eso: si no hay nada encima, el video va DIRECTO a la pantalla del carro (fluido);
     // al tocar (lista, avisos, voz) se pasa a la pantalla intermedia, y al esconderse vuelve a directo.
     private fun hayAlgoEncima(): Boolean =
-        enWeb || panelVisible || escuchando || avisoFijo.isNotEmpty() || avisoTemporal.isNotEmpty()
+        enWeb || panelVisible || listaVisible || escuchando || avisoFijo.isNotEmpty() || avisoTemporal.isNotEmpty()
 
     private val aDirecto = Runnable { usarDirecto() }
 
     /** Si el paso a directo hizo fallar el video una vez, en esta sesión el video se queda en la forma normal. */
-    private var directoFallo = false
+    // v1.27: la salida directa queda apagada. Al tocar la pantalla el video tenía que volver de la salida
+    // directa a la pantalla normal (casi medio segundo de espera) y por eso los toques tardaban. Además,
+    // con la lista en franja aparte el video tiene que achicarse, y eso solo se puede en la pantalla normal.
+    private var directoFallo = true
     /** Hora del último cambio de pantalla (para saber si un error vino de ese cambio). */
     private var ultimoCambio = 0L
 
@@ -1632,11 +1702,14 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     fun alternarPanel() { if (panelVisible) ocultarPanel() else mostrarPanel() }
 
-    /** Botón "Cerrar TV": guarda, detiene y cierra JTV Video en el carro. */
+    /** Botón "⏻ Apagar": guarda, para el video, el sonido y la grabación, y cierra JTV Video en el carro. */
     fun cerrar() {
+        Registro.anotar(ctx, "⏻ JTV Video apagado con el botón Apagar")
         guardarAvance(true)
-        player.pause()
+        if (enWeb) cerrarTikTok()
         ocultarPanel()
+        try { player.stop() } catch (e: Exception) {}
+        Grabador.detener()
         try { ctx.finishCarApp() } catch (e: Exception) {}
     }
 
@@ -1748,14 +1821,14 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
         if (enWeb) { deslizarWeb(distanceY); return }
-        if (!panelVisible) return
+        if (!listaVisible) return
         panelScroll?.scrollBy(0, distanceY.toInt())
         tocado()
     }
 
     override fun onFling(velocityX: Float, velocityY: Float) {
         if (enWeb) { if (kotlin.math.abs(velocityY) > 800) moverWeb(velocityY < 0); return }
-        if (!panelVisible) return
+        if (!listaVisible) return
         panelScroll?.fling(-velocityY.toInt())
         tocado()
     }
@@ -1996,12 +2069,12 @@ class PantallaVideo(ctx: CarContext, private val tv: VideoCarro) : Screen(ctx) {
                 .setMapActionStrip(ActionStrip.Builder().addAction(Action.PAN).build()).build()
         }
         val pelis = tv.modo == Modo.PELICULAS
-        // ☰ Lista muestra la lista ENCIMA del video (no se sale de la pantalla); ✕ la quita.
+        // ☰ Lista muestra la lista en una franja a la izquierda (el video se corre); ✕ la quita.
         val strip = ActionStrip.Builder()
-            .addAction(Action.Builder().setTitle(if (tv.panelVisible) "✕" else "☰ Lista").setOnClickListener {
-                tv.alternarPanel()
+            .addAction(Action.Builder().setTitle(if (tv.listaVisible) "✕" else "☰ Lista").setOnClickListener {
+                tv.alternarLista()
             }.build())
-        if (tv.panelVisible) {
+        if (tv.listaVisible) {
             strip.addAction(Action.Builder().setTitle("🎤 Voz").setOnClickListener { tv.buscarPorVoz() }.build())
             strip.addAction(icono(if (tv.player.playWhenReady) R.drawable.ic_pausa else R.drawable.ic_play) { tv.pausaSigue() })
             if (!pelis) strip.addAction(Action.Builder().setTitle(if (tv.esFavoritoActual()) "★" else "☆")
@@ -2014,7 +2087,7 @@ class PantallaVideo(ctx: CarContext, private val tv: VideoCarro) : Screen(ctx) {
         // Botones del costado: ▲ ▼ ✓ para moverse por la lista sin tocar la pantalla, y el de "mover",
         // que hace que Android Auto pase los toques y el deslizar del dedo (igual que Fermata Auto).
         val mapa = ActionStrip.Builder()
-        if (tv.panelVisible) {
+        if (tv.listaVisible) {
             mapa.addAction(icono(R.drawable.ic_arriba) { tv.moverCursor(-1) })
             mapa.addAction(icono(R.drawable.ic_abajo) { tv.moverCursor(1) })
             mapa.addAction(icono(R.drawable.ic_ok) { tv.elegirCursor() })
