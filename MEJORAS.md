@@ -279,3 +279,9 @@
   Auto) y lo escrito se pone en el cuadro (si es el buscador, busca solo); 2) la página de inicio de sesión de Google
   ya no se abre en el carro: sale el aviso "Para entrar con tu cuenta usa el celular: JTV → ⋮ → Iniciar sesión de
   YouTube (carro)" y YouTube sigue sin cuenta. Respaldo: sin datos nuevos.
+- 2026-11-28: Jorge (captura): JTV → ⋮ → "Iniciar sesión de YouTube (carro)" decía "Primero instala JTV YouTube"
+  aunque sí estaba instalada. Causa: en los manifiestos de JTV YouTube y JTV Video las pantallas estaban escritas
+  con nombre corto (".YouTubeLoginActivity", ".TikTokActivity", ".PermisosActivity"), que Android completa con el
+  nombre del módulo (ec.jat.tv.youtube… / ec.jat.tv.video…), pero las clases están en ec.jat.tv → v1.32: nombres
+  completos. Arregla también "Iniciar sesión de TikTok (carro)" y la pantalla de permisos de JTV Video.
+  OJO: el botón 🔄 debe actualizar también JTV Video y JTV YouTube para que funcione. Respaldo: sin datos nuevos.

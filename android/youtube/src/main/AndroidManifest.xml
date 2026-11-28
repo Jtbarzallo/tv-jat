@@ -30,7 +30,7 @@
 
         <!-- Iniciar sesión de YouTube desde el celular: JTV → ⋮ → Iniciar sesión de YouTube (carro) -->
         <activity
-            android:name=".YouTubeLoginActivity"
+            android:name="ec.jat.tv.YouTubeLoginActivity"
             android:exported="true"
             android:label="Iniciar sesión de YouTube"
             android:configChanges="orientation|screenSize|keyboardHidden"

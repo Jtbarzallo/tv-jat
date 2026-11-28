@@ -39,13 +39,13 @@
         <!-- Canales y películas CON IMAGEN en la pantalla del carro (como Fermata Auto) -->
         <!-- Permisos (micrófono, ubicación, videos) desde el celular: JTV → ⋮ → Activar micrófono del carro -->
         <activity
-            android:name=".PermisosActivity"
+            android:name="ec.jat.tv.PermisosActivity"
             android:exported="true"
             android:label="Permisos de JTV Video" />
 
         <!-- Iniciar sesión de TikTok desde el celular (la sesión se usa en el TikTok del carro) -->
         <activity
-            android:name=".TikTokActivity"
+            android:name="ec.jat.tv.TikTokActivity"
             android:exported="true"
             android:label="TikTok en JTV Video"
             android:configChanges="orientation|screenSize|keyboardHidden"
