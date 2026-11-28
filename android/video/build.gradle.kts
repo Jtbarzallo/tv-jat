@@ -17,6 +17,7 @@ android {
         targetSdk = 34
         versionCode = numero
         versionName = "1.0.$numero"
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
     signingConfigs {
@@ -56,6 +57,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
     implementation("androidx.media3:media3-exoplayer-dash:1.5.1")
     implementation("androidx.media3:media3-ui:1.5.1")
+    // decodificador de audio FFmpeg (AC-3 / E-AC-3 / DTS…) para canales que no se oían
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
     implementation("androidx.car.app:app:1.4.0")
     implementation("androidx.lifecycle:lifecycle-common:2.6.2")
 }

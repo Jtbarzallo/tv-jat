@@ -187,7 +187,9 @@ class AutoService : MediaLibraryService() {
             }
             if (extra.isEmpty()) spec else spec.withAdditionalHeaders(extra)
         }
-        player = ExoPlayer.Builder(this)
+        // + decodificador de audio propio (FFmpeg) para canales con audio Dolby (AC-3/E-AC-3)
+        player = ExoPlayer.Builder(this, androidx.media3.exoplayer.DefaultRenderersFactory(this)
+                .setEnableDecoderFallback(true).setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON))
             .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(this, conCabeceras)))
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),

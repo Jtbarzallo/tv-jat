@@ -912,7 +912,7 @@ class PlayerActivity : Activity() {
             .setReadTimeoutMs(20000)
         val conCabeceras = ResolvingDataSource.Factory(http) { spec -> resolverPedido(spec) }
         Grabador.iniciar(this)
-        val p = ExoPlayer.Builder(this, DefaultRenderersFactory(this).setEnableDecoderFallback(true))
+        val p = ExoPlayer.Builder(this, DefaultRenderersFactory(this).setEnableDecoderFallback(true).setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON))
             .setMediaSourceFactory(FabricaFuentes(DefaultDataSource.Factory(this, conCabeceras)))
             .setLoadControl(DefaultLoadControl.Builder()
                 .setBufferDurationsMs(30_000, 60_000, 2_500, 6_000)
@@ -925,6 +925,10 @@ class PlayerActivity : Activity() {
         aplicarCalidad()
 
         p.addListener(object : Player.Listener {
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                if (Audio.revisar(this@PlayerActivity, tracks) == false) avisoBreve("🔇 Este canal trae un audio que no se puede reproducir")
+            }
+
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
                 aviso.visibility = View.GONE
                 canalActual = canales.getOrNull(p.currentMediaItemIndex)

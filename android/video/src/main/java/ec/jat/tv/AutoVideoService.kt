@@ -222,7 +222,8 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         Grabador.iniciar(ctx)
         main.postDelayed(anotarCuadros, 60_000)
         // si el chip de video del celular no puede abrir un canal, probar con otro decodificador
-        val renderizadores = DefaultRenderersFactory(ctx).setEnableDecoderFallback(true)
+        // + decodificador de audio propio (FFmpeg): canales con audio Dolby (AC-3/E-AC-3) que el celular no trae
+        val renderizadores = DefaultRenderersFactory(ctx).setEnableDecoderFallback(true).setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         player = ExoPlayer.Builder(ctx, renderizadores)
             .setMediaSourceFactory(FabricaFuentes(DefaultDataSource.Factory(ctx, conCabeceras)))
             .setAudioAttributes(
@@ -248,6 +249,10 @@ class VideoCarro(val ctx: CarContext) : SurfaceCallback {
         })
 
         player.addListener(object : Player.Listener {
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                if (Audio.revisar(ctx, tracks) == false) avisoBreve("🔇 Este canal trae un audio que no se puede reproducir")
+            }
+
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 yaArranco = false
                 reintentoPantalla = false

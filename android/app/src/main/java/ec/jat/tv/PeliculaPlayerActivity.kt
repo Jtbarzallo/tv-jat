@@ -159,7 +159,8 @@ class PeliculaPlayerActivity : Activity() {
     private fun actual(): Pelicula? = player?.let { lista.getOrNull(it.currentMediaItemIndex) }
 
     private fun iniciar() {
-        val p = ExoPlayer.Builder(this).build()
+        val p = ExoPlayer.Builder(this, androidx.media3.exoplayer.DefaultRenderersFactory(this)
+            .setEnableDecoderFallback(true).setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)).build()
         player = p
         vista.player = p
         p.addListener(object : Player.Listener {

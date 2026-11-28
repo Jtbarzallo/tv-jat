@@ -266,3 +266,10 @@
   los canales con audio aparte vuelven a verse DIRECTO (como antes de v1.23); la barra sigue con el margen de 20 s y
   la vuelta sola al EN VIVO si un salto no carga. Además el botón Apagar ahora es un ícono (el símbolo ⏻ salía como
   un cuadrito en el celular). Respaldo: sin datos nuevos.
+- 2026-11-27: Jorge: "hay algunos canales que no tienen audio" (captura de Golden, se ve pero no se oye). Causa más
+  probable: canales de cable con audio Dolby (AC-3 / E-AC-3) que el celular no sabe reproducir → v1.30: JTV, JTV Video
+  (y el reproductor de películas y el audio del carro) llevan un decodificador de audio propio (FFmpeg, librería
+  org.jellyfin.media3:media3-ffmpeg-decoder 1.5.0+1); se usa solo cuando el celular no puede. Además cada canal anota
+  en el diagnóstico qué audio trae ("🔊 audio: ac3 · 6 canales · ✅ se oye") y, si aun así no se puede, avisa en
+  pantalla "🔇 Este canal trae un audio que no se puede reproducir". Las APK solo para celulares ARM (todas las de
+  Jorge). Respaldo: sin datos nuevos.
